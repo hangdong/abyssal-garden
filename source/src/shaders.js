@@ -294,7 +294,7 @@ fn botC(h: f32) -> vec3f {
 }
 fn partC(ao: f32, sd: f32) -> vec3f {
   let a = fract(sd * 13.7); let b = fract(sd * 7.3 + .31); let c = fract(sd * 3.9 + .7);
-  if (ao < .3) { return skinC(a); }
+  if (ao < .3) { return mix(skinC(a), vec3f(.55, .2, .2), step(.27, ao) * .75); }
   if (ao < .5) { return topC(b); }
   if (ao < .7) { return botC(c); }
   if (ao < .85) { return mix(vec3f(.02, .015, .01), vec3f(.35, .22, .08), step(.75, a) * c); }
@@ -306,6 +306,12 @@ fn skyAt(rd: vec3f) -> vec3f {
   let h = sat(rd.y);
   var c = mix(vec3f(1.7, 2.3, 2.9), vec3f(.28, .75, 2.3), pow(h, .4));
   let mu = max(dot(rd, g.sun.xyz), 0.);
+  if (rd.y > .02) {   // drifting clouds: two octaves of the rock mottling texture, projected on a flat layer; thick cores are greyer
+    let uv = rd.xz / (rd.y + .12) * .55 + vec2f(g.cam.w * .004, g.cam.w * .0015);
+    let n = textureSampleLevel(tD, sR, uv, 0.).a * .6 + textureSampleLevel(tD, sR, uv * 2.7 + 3.1, 0.).a * .4;
+    let cl = ss(.5, .72, n) * ss(.02, .22, rd.y);
+    c = mix(c, vec3f(2.7, 2.7, 2.6) - vec3f(.8, .7, .5) * ss(.55, .9, n), cl * .85);
+  }
   c += vec3f(1., .93, .8) * (pow(mu, 6.) * .2 + pow(mu, 60.) * .5 + pow(mu, 1500.) * 60.);
   return c;
 }
@@ -343,8 +349,9 @@ fn animActor(i: VI) -> vec3f {
   let pose = floor(i.c.w); let r = i.c.w - pose;
   let dv = g.cam.xyz - i.a.xyz; let lq = qrot(vec4f(-i.b.xyz, i.b.w), dv); let near = ss(30., 12., length(dv));
   let q0 = p;
+  let kid = step(i.a.w, .75);
   if (i.c.x > 12.5) {
-    let amt = r / .99; let mvx = step(.5, r); let pk = (r - mvx * .5) / .49; let lk = clamp(atan2(lq.x, lq.z), -1., 1.) * near;
+    let amt = r / .99; let mvx = step(.5, r); let pk = (r - mvx * .5) / .49; let lk = clamp(atan2(lq.x, lq.z), -1., 1.) * near * ss(-.2, .5, lq.z / max(length(lq.xz), .01));
     if (i.c.x < 13.5) {            // gull: wings (aux .3 and .5) fold on the ground and flap in flight
       let wing = step(.25, i.n.w) * step(i.n.w, .55); let side = select(-1., 1., q0.z > 0.);
       if (pose < .5 || pose > 1.5) {   // on the ground, afloat or diving: the wings fold back
@@ -358,7 +365,7 @@ fn animActor(i: VI) -> vec3f {
         if (q0.y < .17 && q0.x > -.05 && q0.x < .12) { p = rotZ(p, vec3f(.01, .18, 0.), 1.25); }   // legs tucked back
       }
       if (q0.x > .3) { p = rotY(p, vec3f(.26, .38, 0.), lk * .7); }
-    } else {                        // chipmunk: run, or sit up and beg
+    } else if (i.c.x < 14.5) {       // chipmunk: run, or sit up and beg
       let fw = step(.03, q0.x) * step(q0.y, .04); let hw = step(q0.x, -.02) * step(q0.y, .045); let side = select(-1., 1., q0.z > 0.);
       if (pose < .5) {
         if (fw > 0.) { p = rotZ(p, vec3f(.045, .04, 0.), sin(ph + select(0., 3.14, q0.z > 0.)) * .9 * amt); }
@@ -371,10 +378,28 @@ fn animActor(i: VI) -> vec3f {
       }
       p.z += sin(t * 5. + sd * 20.) * .008 * ss(-.09, -.15, q0.x);
       if (q0.x > .07) { p = rotY(p, vec3f(.075, .06, 0.), lk * .8); }
+    } else {                        // crab: scurries sideways, rears up with the claws open and pinches, or digs itself in
+      let side = select(-1., 1., q0.z > 0.); let ax = i.n.w;
+      let leg = step(.15, ax) * step(ax, .22); let claw = step(.22, ax) * step(ax, .35); let mov = step(.28, ax) * step(ax, .35);
+      let sh = vec3f(.045, .04, side * .055);
+      if (pose < .5) {
+        let w1 = ph * 2.2 + q0.x * 50. + side * 1.6;
+        p = mix(p, rotY(p, vec3f(q0.x * .9, .035, side * .06), sin(w1) * .5 * amt), leg);
+        p.y += max(0., sin(w1 + 1.5)) * .012 * leg * amt + abs(sin(ph * 2.2)) * .004 * amt;
+        p = mix(p, rotZ(p, sh, .15 + sin(t * 2. + side) * .06), claw);
+      } else if (pose < 1.5) {
+        p = mix(p, rotY(p, sh, side * .35 * amt), claw);
+        p = mix(p, rotZ(p, sh, .15 + .8 * amt), claw);
+        p = mix(p, rotY(p, vec3f(.13, .058, side * .088), side * (.1 + .5 * abs(sin(ph * 7.))) * amt), mov);
+        p.y += .006 * amt;
+      } else {
+        p.x += sin(t * 30. + q0.z * 40.) * .003 * amt;
+        p = mix(p, rotY(p, vec3f(q0.x * .9, .035, side * .06), sin(t * 25. + q0.x * 50. + side) * .6 * amt), leg);
+      }
     }
   } else if (i.c.x < 10.5) {
     let amt = r / .99;
-    var look = mix(sin(t * .35 + sd * 40.) * .5, clamp(atan2(lq.x, lq.z), -1.1, 1.1), near);
+    var look = mix(sin(t * .35 + sd * 40.) * .5, clamp(atan2(lq.x, lq.z), -1.1, 1.1) * ss(-.2, .5, lq.z / max(length(lq.xz), .01)), near);
     if (pose < .5) {
       let side = select(-1., 1., q0.x > 0.); let s = ph + select(3.14159, 0., q0.x > 0.);
       if (abs(q0.x) > .03 && q0.y < .96) {
@@ -440,10 +465,20 @@ fn animActor(i: VI) -> vec3f {
       p.y -= .22 * ss(.1, 1., q0.y);
       if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.45, 0.), look * .5); }
     }
+    if (kid > .5 && i.c.x < 10.5) {   // a child's head is bigger for its body
+      if (pose < .5 && q0.y > 1.52) { p = vec3f(0., 1.5, 0.) + (p - vec3f(0., 1.5, 0.)) * 1.28; }
+      else if (pose > .5 && pose < 1.5 && q0.y > .78) { p = vec3f(0., .74, -.06) + (p - vec3f(0., .74, -.06)) * 1.28; }
+      else if (pose > 2.5 && pose < 3.5 && q0.y > .74) { p = vec3f(0., .7, .12) + (p - vec3f(0., .7, .12)) * 1.28; }
+    }
   } else {
     let mv = step(.5, r); let alert = (r - mv * .5) / .49;
-    let lyaw = clamp(atan2(-lq.z, lq.x), -1., 1.) * near;
-    if (pose < .5 || pose > 1.5) {
+    let lyaw = clamp(atan2(-lq.z, lq.x), -1., 1.) * near * ss(.2, .8, lq.x / max(length(lq.xz), .01));
+    if (pose > 2.5) {   // a seal on land: it humps along on its belly, the head up, the short front flippers dragging
+      let mvs = r / .99;
+      p.y += max(0., sin(ph - q0.x * 4.5)) * .07 * mvs; p.z += sin(ph - q0.x * 3.) * .03 * mvs;
+      p = mix(p, rotZ(p, vec3f(.45, .04, 0.), .5), ss(.45, .8, q0.x));
+      p = mix(p, rotY(p, vec3f(.6, .05, 0.), lyaw * .5), ss(.6, .95, q0.x));
+    } else if (pose < .5 || pose > 1.5) {
       let ag = step(1.5, pose); let lg = r / .99 * ag; let al = mix(alert, 1., ag); let rest = 1. - al;
       p.y *= mix(1., 1. + .03 * sin(t * 1.7 + sd * 30.), ss(.6, -.2, q0.x));
       // resting: the neck lowers, the fore flippers splay out and the chest settles; aggressive: the head lunges
@@ -505,6 +540,7 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
   o.n = vec3f(0., a.y, a.x) * w.x + vec3f(b.x, 0., b.y) * w.y + vec3f(c.x, c.y, 0.) * w.z;
   return o;
 }
+@fragment fn fsBlob(i: VO) -> @location(0) vec4f { return vec4f(0., 0., 0., .5 * (1. - ss(.15, 1., i.ao))); }
 @fragment fn fs(i: VO, @builtin(front_facing) ff: bool) -> @location(0) vec4f {
   let mat = i32(i.m.x + .5); let sd = i.m.y; let fl_ = select(-1., 1., ff);
   let on = normalize(i.on) * fl_; let n0 = normalize(i.n) * fl_;
@@ -596,6 +632,13 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
       alb = pc;
     }
     bump = .3; gloss = .3;
+  } else if (mat == 15) {
+    var cc = mix(vec3f(.38, .17, .09), vec3f(.8, .3, .12), fract(sd * 5.3)) * (.8 + .4 * B.h);
+    cc = mix(cc, cc * vec3f(1.3, 1.15, 1.), ss(.1, -.6, on.y) * .6);
+    cc = mix(cc, cc * .85, step(.15, i.ao) * step(i.ao, .22));
+    cc = mix(cc, cc * 1.15 + vec3f(.05, .02, 0.), step(.22, i.ao) * step(i.ao, .28));
+    cc = mix(cc, vec3f(.92, .85, .75), step(.28, i.ao) * step(i.ao, .35) * ss(.15, .5, fract(sd * 3.)) * .6);
+    alb = mix(cc, vec3f(.02), step(.9, i.ao)); bump = .5; gloss = .4;
   } else if (mat == 14) {
     let lp = i.op - vec3f(sd * 37.); let zz = abs(lp.z) / .035;
     let st = ss(.1, .2, zz) * ss(.7, .6, zz) * (.5 + .5 * step(zz, .4)) * ss(0., .4, on.y);
@@ -611,7 +654,7 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
     alb = mix(alb, vec3f(.015, .01, .008), step(.7, i.ao) * step(i.ao, .85)); alb = mix(alb, vec3f(.78, .74, .66), step(.9, i.ao));
     if (sd > 5.) {   // a seal: grey, spotted, flippers and fur alike
       let spots = ss(.6, .68, B.c * .5 + C.c * .5 + (fract(sd * 3.1) - .5) * .1);
-      var sl = mix(vec3f(.36, .38, .4), vec3f(.62, .64, .63), fract(sd * 3.1)) * (.85 + .3 * B.h);
+      var sl = mix(vec3f(.17, .18, .19), vec3f(.33, .34, .34), fract(sd * 3.1)) * (.85 + .3 * B.h);
       sl = mix(sl, vec3f(.08, .09, .1), spots * .6); sl = mix(sl, sl * 1.25, ss(.1, -.7, on.y) * .5);
       alb = mix(sl, alb, step(.7, i.ao) * step(i.ao, .85)); alb = mix(alb, vec3f(.78, .74, .66), step(.9, i.ao));
     }
@@ -699,6 +742,7 @@ fn pal(h: f32) -> vec3f {
     case 4 { col = mix(vec3f(.30, .15, .02), vec3f(.42, .25, .04), s1); pr = vec4f(.2, 1., .1, 0.); spc = vec3f(1., .85, .5); shp = vec2f(.5, .4); wav = 1.8; }
     case 5 { col = mix(vec3f(.85, .05, .40), vec3f(.60, .10, .80), step(.7, s1)); col = mix(col, vec3f(.95, .25, .55), step(.75, s2)); pr = vec4f(.22, .8, 0., .30); spc = vec3f(1., .35, .8); shp = vec2f(.6, .6); fls = 2.; }
     case 8 { col = mix(vec3f(.03, .30, .03), vec3f(.14, .52, .06), s1); pr = vec4f(0., .9, .15, 0.); shp = vec2f(.45, .3); wav = 2.4; fls = .6; }
+    case 9 { col = mix(vec3f(.07, .17, .03), vec3f(.2, .3, .07), s1); col = mix(col, vec3f(.38, .32, .1), step(.86, s2)); pr = vec4f(0., .7, .1, 0.); shp = vec2f(.4, .3); wav = 1.6; fls = .5; }
     case 6 { col = mix(vec3f(.80, .16, .16), vec3f(.92, .36, .42), s1); pr = vec4f(.06, 1., 0., .10); spc = vec3f(1., .5, .5); shp = vec2f(.4, .3); wav = 2.; }
     default { col = mix(vec3f(.05, .40, .36), vec3f(.10, .52, .58), s1); pr = vec4f(.1, .9, .2, .04); spc = vec3f(.3, 1., .9); shp = vec2f(.6, .5); }
   }

@@ -105,6 +105,7 @@ const pLeafF = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: 
 const pFish = scenePipe(mAnim, 'vsFish', 'fsFish', [vbSolid, ibAnim]);
 const pManta = scenePipe(mAnim, 'vsManta', 'fsManta', [vbSolid, ibAnim]);
 const PRE = { color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } };
+const pBlob = scenePipe(mSolid, 'vs', 'fsBlob', [vbSolid, ibSolid], { blend: PRE });
 const pSurf = scenePipe(mSurf, 'vs', 'fs', [], { strip: true, blend: PRE, dw: 1 }), pBack = scenePipe(mSurf, 'vsB', 'fsB', [], { strip: true });
 const pBub = scenePipe(mSpr, 'vsBub', 'fsBub', [ibBub], { strip: true, blend: { color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } } });
 const ADD = { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } };
@@ -290,8 +291,8 @@ const DECO0 = meshes.length; // palm, 2 trees, bush, step, rail, lamp
 meshes.push(meshPalm().build(), meshTree(1).build(), meshTree(2).build(), meshBush().build(), meshStep().build(), meshRail().build(), meshLamp().build(), meshBench().build(), meshTowerC().build(), meshTowerG().build(), meshTowerW().build(),
   meshPerson(0).build(), meshPerson(1).build(), meshPerson(2).build(), meshPerson(3).build(), meshUmbrella().build(), meshSeaLion(false).build(), meshCaveFrame().build());
 const GAR = meshGaribaldi().build(), SNORK = meshPerson(4).build(), LIONSWIM = meshSeaLion(true).build(), SEAL = meshSeal().build(), GULL = meshGull().build(), CHIP = meshChipmunk().build();
-const BOARD = meshSurfboard().build(), SUPB = meshSUPBoard().build(), KAYAK = meshKayak().build(), PAD1 = meshPaddle(false).build(), PAD2 = meshPaddle(true).build(), FOAM = meshFoam().build(), PELICAN = meshPelican().build();
-meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN);
+const BOARD = meshSurfboard().build(), SUPB = meshSUPBoard().build(), KAYAK = meshKayak().build(), PAD1 = meshPaddle(false).build(), PAD2 = meshPaddle(true).build(), FOAM = meshFoam().build(), PELICAN = meshPelican().build(), CRAB = meshCrab().build(), BLOB = meshBlob(1, 1).build(), BLOBL = meshBlob(1.9, 0.85).build(), CFISH = meshCaughtFish().build();
+meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, BLOB, BLOBL, CFISH);
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
 const allV = new Uint8Array(nV * 16), allI = new Uint32Array(nI);
@@ -308,11 +309,11 @@ const drawDeco = (r) => { for (let k = 0; k < nDeco.length; k++) if (nDeco[k]) {
 // Every figure is an actor: a little state machine on the CPU (where it is, what it does, how it reacts to the camera) that
 // writes one instance per frame. The vertex shader poses it (walk cycle, digging, waving, head turn, breathing, swim stroke).
 // slots: 0-3 people (stand, sit, lie, crouch), 4 snorkeler, 5 sea lion on land, 6 sea lion swimming
-const SLM = [meshes[DECO0 + 11], meshes[DECO0 + 12], meshes[DECO0 + 13], meshes[DECO0 + 14], SNORK, meshes[DECO0 + 16], LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN];   // 16 pelican, 10 surfboard, 11 paddle board, 12 kayak, 13 paddle, 14 kayak paddle, 15 spray
+const SLM = [meshes[DECO0 + 11], meshes[DECO0 + 12], meshes[DECO0 + 13], meshes[DECO0 + 14], SNORK, meshes[DECO0 + 16], LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, CFISH];   // 18 the pelican's fish, 17 crab, 16 pelican, 10 surfboard, 11 paddle board, 12 kayak, 13 paddle, 14 kayak paddle, 15 spray
 const NACT = Wd.actors.length, SLI = SLM.map(() => new Float32Array(NACT * 12)), SLN = new Uint32Array(SLM.length);
 const SLB = SLM.map(() => device.createBuffer({ size: NACT * 48, usage: BU.VERTEX | BU.COPY_DST }));
 const drawActors = (r) => { for (let s = 0; s < SLM.length; s++) if (SLN[s]) { r.setVertexBuffer(1, SLB[s]); r.drawIndexed(SLM[s].ib.length, SLN[s], SLM[s].i0, SLM[s].v0, 0); } };
-const ACT = Wd.actors.map((a) => ({ k: a.k, pose: a.pose || 0, hpose: a.pose || 0, x: a.x, z: a.z, y: 0, yaw: a.yaw, hx: a.x, hz: a.z, hyaw: a.yaw, sc: a.sc, seed: a.seed, ph: a.seed * 6, amt: 0, st: a.st !== undefined ? a.st : a.walk ? 4 : 0, tm: 0, high: a.high, lift: a.lift || 0, wx: a.x, wz: a.z, y0: a.y0, hy: 0, fish: 0, caught: 0, roll: 0, pk: 0, pk2: 0, fy: 10, dir: 1, sp: 0, mx: 0, mz: 1, cd: a.k === 'F' ? 0 : 4 + a.seed * 10, al: -1,
+const ACT = Wd.actors.map((a) => ({ k: a.k, pose: a.pose || 0, hpose: a.pose || 0, x: a.x, z: a.z, y: 0, yaw: a.yaw, hx: a.x, hz: a.z, hyaw: a.yaw, sc: a.sc, seed: a.seed, ph: a.seed * 6, amt: 0, st: a.st !== undefined ? a.st : a.walk ? 4 : 0, tm: 0, high: a.high, lift: a.lift || 0, wx: a.x, wz: a.z, y0: a.y0, hy: 0, fish: 0, caught: 0, dig: 0, cl: 0, ft: 0, fx: 0, fz: 0, vc: 25 + a.seed * 70, vol: 0, vtm: 0, roll: 0, pk: 0, pk2: 0, fy: 10, dir: 1, sp: 0, mx: 0, mz: 1, cd: a.k === 'F' ? 0 : 4 + a.seed * 10, al: -1,
   w: a.walk, wt: 0, hd: a.yaw, mood: 0, seen: 0, bc: 0, bk: 0, hit: 0, lg: 0, pup: a.k === 'L' && a.sc < 0.7, ab: 0, wq: 0, tx: a.x, tz: a.z, dv: a.seed * 20, ret: 0, away: 0, idle: 0, mv: 0, pitch: 0, home: a.k === 'L' }));
 let ACTINIT = false; // the collision grid is read the first time the actors update
 const wlX = (z) => 130 + 14 * (1 - min(z * z / 1600, 1)); // x of the waterline at z (see the beach in W_DENS)
@@ -333,6 +334,10 @@ const barkAt = (a, mood) => {
   BARK(clamp((dx * F[RX] + dz * F[RZ]) / (d + 1), -1, 1), (mood ? 0.8 : 0.55) * clamp(1.2 - d / 35, 0, 1), mood);
 };
 function updPerson(a, dt, px, pz, py) {
+  if (a.ft > 0) { // just pinched: hop away from the crab
+    a.ft -= dt; a.pose = 0; stepActor(a, a.x - a.fx, a.z - a.fz, 2.4, dt, -0.45); turnTo(a, atan2(a.mx, a.mz), 8, dt);
+    a.amt += (1 - a.amt) * min(1, dt * 8); a.ph += 2.4 * 4.2 * dt; if (a.ft <= 0) { a.st = 3; a.tm = 0; } return;
+  }
   const dx = a.x - px, dz = a.z - pz, d = hypot(dx, dz), kid = a.sc < 0.72;
   const R = (a.hpose === 0 ? 3.2 : 2.4) * (kid ? 1.4 : 1) * (py < -2 ? 0.3 : 1);
   let sp = 0;
@@ -372,10 +377,10 @@ function updPerson(a, dt, px, pz, py) {
   a.ph += sp * (kid ? 6 : 4.2) * dt;
 }
 // A hurt: the camera is shoved away from (fx, fz) and the picture flashes red
-function hurt(fx, fz) {
+function hurt(fx, fz, pw = 9) {
   const dx = px0(), dz = pz0(), l = hypot(dx - fx, dz - fz) || 1;
-  F[VX] += (dx - fx) / l * 9; F[VZ] += (dz - fz) / l * 9;
-  canvas.style.filter = 'sepia(1) saturate(5) hue-rotate(-40deg) brightness(.7)'; setTimeout(() => { canvas.style.filter = ''; }, 280);
+  F[VX] += (dx - fx) / l * pw; F[VZ] += (dz - fz) / l * pw;
+  canvas.style.filter = 'sepia(1) saturate(5) hue-rotate(-40deg) brightness(.7)'; setTimeout(() => { canvas.style.filter = ''; }, pw > 5 ? 280 : 160);
 }
 const px0 = () => F[CX], pz0 = () => F[CZ];
 // land sea lion states: 0 resting, 1 gallop to the sea, 2 back up the beach, 3 warning (rears up and barks), 4 charge, 5 bite
@@ -392,6 +397,8 @@ function updLion(a, dt, px, pz, py) {
     if (d < 14) turnTo(a, atan2(dz, -dx), 1.2, dt);
     a.cd -= dt; if (d < 13 && a.cd < 0 && rnd() < dt * 0.3) { barkAt(a, 0); a.cd = 8 + rnd() * 8; }
     if (a.al > 0) { a.al -= dt; if (a.al <= 0) { a.al = -1; a.st = a.mood ? 0 : 1; } }
+    a.vc -= dt;
+    if (!a.pup && a.vc < 0 && d > 28 && hypot(a.x - a.hx, a.z - a.hz) < 1) { a.vc = 40 + rnd() * 80; a.vol = 1; a.st = 1; }   // now and then one goes for a swim
     if (a.mood && d < 8.5 && a.bc < 0) { a.st = 3; a.tm = 0; a.bk = 0; }
     else if (!a.mood && d < (a.pup ? 3.5 : 5.2)) a.st = 1;
     a.bc -= dt;
@@ -414,7 +421,7 @@ function updLion(a, dt, px, pz, py) {
       a.x -= sp * dt; a.mx = -1; a.mz = 0; a.y += (ground(a.x, a.y + 1.5, a.z) - a.y) * min(1, dt * 8);
     }
     turnTo(a, atan2(-a.mz, a.mx), 5, dt);
-    if (ground(a.x, 2, a.z) < -0.65) { a.k = 'S'; a.st = 0; a.y = -0.35; a.hd = atan2(a.mz, a.mx); a.dv = 1.2; a.tm = 0; a.away = 0; }
+    if (ground(a.x, 2, a.z) < -0.65) { a.k = 'S'; a.st = 0; a.y = -0.35; a.hd = atan2(a.mz, a.mx); a.dv = 1.2; a.tm = 0; a.away = 0; a.vtm = a.vol ? 30 + rnd() * 40 : 0; }
   } else if (a.st === 2) { // back from the water: walk up the beach to the spot
     const hx = a.hx - a.x, hz = a.hz - a.z; sp = 1.6; a.mv = 1; a.amt += (0.5 - a.amt) * min(1, dt * 3);
     if (hypot(hx, hz) < 0.5) { a.st = 0; a.yaw = a.hyaw; a.mv = 0; sp = 0; a.hd = a.yaw; } else { stepActor(a, hx, hz, sp, dt, -3); turnTo(a, atan2(-a.mz, a.mx), 4, dt); }
@@ -444,6 +451,7 @@ function updSwimmer(a, dt, px, pz, py) {
   let tx = a.x, tz = a.z, sp = lion ? 1.6 : 0.5;
   if (lion) {
     if (a.home) { a.away = d > 30 && hypot(px - a.hx, pz - a.hz) > 28 ? a.away + dt : 0; if (a.away > 18) a.ret = 1; if (hypot(px - a.hx, pz - a.hz) < 22) a.ret = 0; }
+    if (a.vol) { a.vtm -= dt; if (a.vtm < 0) a.ret = 1; }
     if (a.ret) { tx = wlX(a.hz) - 0.5; tz = a.hz; sp = 1.8; }
     else if (d < 32 && py < 2) { // curious: circle the camera, closer when it is underwater
       const rad = py > -0.5 ? 6.5 : 3.5, an = atan2(a.z - pz, a.x - px) + 0.7;
@@ -460,7 +468,7 @@ function updSwimmer(a, dt, px, pz, py) {
   let want = atan2(tz - a.z, tx - a.x);
   const g0 = ground(a.x, 2, a.z), ah = ground(a.x + cos(a.hd) * 3.5, 2, a.z + sin(a.hd) * 3.5);
   if (!a.ret && ah > -1.5) want = PI;                       // too shallow ahead: head out to sea
-  if (lion && a.ret && g0 > -0.45) { a.k = 'L'; a.st = 2; a.yaw = atan2(-sin(a.hd), cos(a.hd)); a.mx = cos(a.hd); a.mz = sin(a.hd); a.y = g0; a.amt = 0.5; return; }
+  if (lion && a.ret && g0 > -0.45) { a.k = 'L'; a.st = 2; a.vol = 0; a.yaw = atan2(-sin(a.hd), cos(a.hd)); a.mx = cos(a.hd); a.mz = sin(a.hd); a.y = g0; a.amt = 0.5; return; }
   angTo(a, want, lion ? 1.6 : 0.9, dt);
   a.x += cos(a.hd) * sp * dt; a.z += sin(a.hd) * sp * dt;
   a.dv += dt * (lion ? 0.55 : 1);
@@ -473,11 +481,11 @@ function updSwimmer(a, dt, px, pz, py) {
   a.yaw = atan2(-sin(a.hd), cos(a.hd)); a.mv = sp;
 }
 // Nothing overlaps: pairs that come closer than their radii are pushed apart, and land animals and people are pushed out of boulders.
-const actRad = (a) => (a.k === 'P' || a.k === 'V' ? [0.34, 0.5, 0.78, 0.42][a.pose] * (a.pose === 2 ? 1 : a.sc) : a.k === 'N' ? 0.6 : a.k === 'Q' ? 0.5 : a.k === 'K' ? 1.6 : a.k === 'U' ? 1.1 : a.k === 'R' ? 1.0 : a.k === 'F' ? 0.3 : a.k === 'G' ? 0.22 : a.k === 'C' ? 0.1 : a.k === 'E' ? 0.6 * a.sc : 0.85 * a.sc);
+const actRad = (a) => (a.k === 'P' || a.k === 'V' ? [0.34, 0.5, 0.78, 0.42][a.pose] * (a.pose === 2 ? 1 : a.sc) : a.k === 'N' ? 0.6 : a.k === 'X' ? 0.14 * a.sc : a.k === 'Q' ? 0.5 : a.k === 'K' ? 1.6 : a.k === 'U' ? 1.1 : a.k === 'R' ? 1.0 : a.k === 'F' ? 0.3 : a.k === 'G' ? 0.22 : a.k === 'C' ? 0.1 : a.k === 'E' ? 0.6 * a.sc : 0.85 * a.sc);
 function separate() {
   for (let it = 0; it < 2; it++) {
     for (let i = 0; i < NACT; i++) {
-      const a = ACT[i], ra = actRad(a), land = a.k === 'P' || a.k === 'L' || a.k === 'V';
+      const a = ACT[i], ra = actRad(a), land = a.k === 'P' || a.k === 'L' || a.k === 'V' || a.k === 'X';
       if ((a.k === 'G' || a.k === 'Q') && a.st >= 2 && a.st !== 5) continue;
       for (let j = i + 1; j < NACT; j++) {
         const b = ACT[j]; if ((b.k === 'G' || b.k === 'Q') && b.st >= 2 && b.st !== 5) continue;
@@ -660,32 +668,41 @@ function emitCraft(a) {
 }
 // ---------------------------------------------------------------- roles: swim as yourself, or be a sea lion, a gull or the lifeguard
 // T changes role, V swaps between the chase camera and the animal's own eyes, B calls: a bark, a squawk, or the lifeguard's warning.
-const ROLES = ['Swimmer', 'Sea lion', 'Gull', 'Lifeguard', 'Pelican'], CALLS = ['', 'bark', 'squawk', 'warn the visitors', 'plunge-dive for fish'];
-let ROLE = 0, TPV = true, swapped = false, score = 0, callCd = 0, callT = 0, fishCaught = 0;
+const ROLES = ['Swimmer', 'Sea lion', 'Gull', 'Lifeguard', 'Pelican', 'Crab', 'Seal'], CALLS = ['', 'bark  ·  E charge and bite', 'squawk', 'warn the visitors', 'plunge-dive for fish', 'pinch  ·  E dig in / out', 'grunt'];
+let ROLE = 0, TPV = true, swapped = false, score = 0, callCd = 0, callT = 0, fishCaught = 0, pinched = 0;
 const PL = new Float64Array(3), EY = new Float64Array(3), DV = new Float64Array(7);
 // avatar: mode 0 on the ground (sea lion on land, gull walking), 1 in the water (swimming, floating), 2 in the air (gull)
-const AV = { x: 0, y: 0, z: 0, hd: PI, pitch: 0, roll: 0, sp: 0, ph: 0, mode: 0, vx: 0, vy: 0, vz: 0, mv: 0, alert: 0.9, fl: 0.3, idle: 0, yawp: 0, tm: 0, swal: 0 };
+const AV = { x: 0, y: 0, z: 0, hd: PI, pitch: 0, roll: 0, sp: 0, ph: 0, mode: 0, vx: 0, vy: 0, vz: 0, mv: 0, alert: 0.9, fl: 0.3, idle: 0, yawp: 0, tm: 0, swal: 0, held: false, dig: 0, digT: 0, pinchT: 0, byaw: 0 };
 const HUDR = document.createElement('div');
 HUDR.style.cssText = 'position:fixed;top:1em;left:50%;transform:translateX(-50%);padding:.35em .9em;background:#0008;color:#e8fbff;font:600 .85em system-ui,sans-serif;border-radius:2em;pointer-events:none;z-index:5;white-space:nowrap';
 document.body.append(HUDR);
-function roleHud() { HUDR.textContent = ROLES[ROLE] + (ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : ''); }
+function roleHud() { HUDR.textContent = ROLES[ROLE] + (ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
 function setRole(r) {
   if (ROLE === 0) { DV[0] = F[CX]; DV[1] = F[CY]; DV[2] = F[CZ]; DV[3] = F[YAW]; DV[4] = F[PIT]; DV[5] = walk ? 1 : 0; DV[6] = above ? 1 : 0; }
-  ROLE = r; walk = above = false; F[VX] = F[VY] = F[VZ] = 0; TPV = true; swapped = false; AV.vx = AV.vy = AV.vz = AV.sp = AV.mv = AV.pitch = AV.roll = 0;
+  ROLE = r; if (!PERCH.length) buildPerches(); perchOn = r === 2 || r === 4; walk = above = false; F[VX] = F[VY] = F[VZ] = 0; TPV = true; swapped = false; AV.vx = AV.vy = AV.vz = AV.sp = AV.mv = AV.pitch = AV.roll = 0;
   if (r === 0) { F[CX] = DV[0]; F[CY] = DV[1]; F[CZ] = DV[2]; F[YAW] = DV[3]; F[PIT] = DV[4]; walk = !!DV[5]; above = !!DV[6]; }
   else if (r === 1) { AV.x = 143.5; AV.z = 12; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.mode = 0; AV.alert = 0.9; F[YAW] = -PI / 2; F[PIT] = -0.2; }
   else if (r === 2) { AV.x = 136; AV.y = 11; AV.z = 4; AV.hd = PI; AV.mode = 2; AV.sp = 6; F[YAW] = -PI / 2; F[PIT] = -0.1; }
   else if (r === 4) { AV.x = 132; AV.y = 10; AV.z = -6; AV.hd = PI; AV.mode = 2; AV.sp = 6.5; F[YAW] = -PI / 2; F[PIT] = -0.1; }
+  else if (r === 6) { AV.x = 143.5; AV.z = 12; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.mode = 0; F[YAW] = -PI / 2; F[PIT] = -0.2; }
+  else if (r === 5) { AV.x = 147; AV.z = -10; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.dig = AV.digT = 0; AV.byaw = 0; AV.pinchT = 0; F[YAW] = -PI / 2; F[PIT] = -0.25; }
   else { F[CX] = 182.5; F[CZ] = -14; F[CY] = ground(182.5, 12, -14) + 1.7; walk = true; F[YAW] = -PI / 2; F[PIT] = -0.1; }
   if (r === 1) { BB.x = AV.x - 1.6; BB.z = AV.z + 0.6; BB.y = ground(BB.x, 4, BB.z); BB.mode = 0; BB.hd = PI; }
   roleHud();
 }
 const avTurn = (want, rate, dt) => { let d = want - AV.hd; d = atan2(sin(d), cos(d)); const m = rate * dt; AV.hd += d < -m ? -m : d > m ? m : d; };
 function lionMove(dt, yaw, pitch, mf, mr, fast) {
-  const A = AV, sy = sin(yaw), cw = cos(yaw), cp = cos(pitch);
-  if (A.mode === 0) { // on land: waddle, or gallop
-    let dx = sy * mf + cw * mr, dz = -cw * mf + sy * mr; const l = hypot(dx, dz), sp = fast ? 5 : 2.4;
+  const A = AV, sy = sin(yaw), cw = cos(yaw), cp = cos(pitch), SEAL_ = ROLE === 6;
+  if (A.mode === 0) { // on land: waddle, or gallop (a seal humps along on its belly, much slower)
+    let dx = sy * mf + cw * mr, dz = -cw * mf + sy * mr; let l = hypot(dx, dz), sp = SEAL_ ? (fast ? 2.2 : 1.1) : fast ? 5 : 2.4;
     A.mv = 0;
+    if (A.chg > 0 && !SEAL_) { // aggressive charge: rush the nearest person, then bite
+      A.chg -= dt; let bd = 16, tb = null;
+      for (const b of ACT) if ((b.k === 'P' || b.k === 'V') && b.pose !== 2) { const d = hypot(b.x - A.x, b.z - A.z); if (d < bd) { bd = d; tb = b; } }
+      if (tb) { dx = tb.x - A.x; dz = tb.z - A.z; l = hypot(dx, dz); sp = 7; if (bd < 1.5 && !(A.biteT > 0)) { A.biteT = 0.6; if (BARK) BARK(0, 0.8, 2); crabPinchPerson(tb, A.x, A.z); tb.ft = 5; bitten++; roleHud(); toast(['Aaah! It bit me!', 'Run! Sea lion!', 'Ow! Get away!'][bitten % 3], 1); A.chg = 0.3; } }
+      else sp = 6;
+    }
+    if (A.biteT > 0) A.biteT -= dt;
     if (l > 0.05) {
       dx /= l; dz /= l;
       for (let k = 0; k < 3; k++) {
@@ -700,7 +717,7 @@ function lionMove(dt, yaw, pitch, mf, mr, fast) {
     if (ground(A.x, 2, A.z) < -0.65) { A.mode = 1; A.y = -0.35; }
     F[CX] = A.x; F[CY] = A.y + 0.9; F[CZ] = A.z;
   } else { // swimming: fast and free, rowing with the fore flippers
-    const sp = fast ? 8 : 4, k = 1 - exp(-dt * 3);
+    const sp = SEAL_ ? (fast ? 6.5 : 3.4) : fast ? 8 : 4, k = 1 - exp(-dt * 3);
     A.vx += ((sy * cp * mf + cw * mr) * sp - A.vx) * k; A.vz += ((-cw * cp * mf + sy * mr) * sp - A.vz) * k; A.vy += ((sin(pitch) * mf + (ku - kd)) * sp - A.vy) * k;
     let nx = A.x + A.vx * dt, ny = A.y + A.vy * dt, nz = A.z + A.vz * dt; const r = hypot(nx, nz); if (r > 150) { nx *= 150 / r; nz *= 150 / r; } if (nx > 120) nz = nz < -72 ? -72 : nz > 72 ? 72 : nz;
     const g0 = ground(nx, 2, nz);
@@ -715,7 +732,7 @@ function lionMove(dt, yaw, pitch, mf, mr, fast) {
 }
 function lookMove(dt, yaw, pitch) {
   const fast = ks || tN > 1, mf = tId >= 0 ? 0.7 : kf - kb, mr = kr - kl;
-  if (ROLE === 1) lionMove(dt, yaw, pitch, mf, mr, fast); else gullMove(dt, yaw, pitch, mf, mr, fast);
+  if (ROLE === 1 || ROLE === 6) lionMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 5) crabMove(dt, yaw, mf, mr, fast); else gullMove(dt, yaw, pitch, mf, mr, fast);
 }
 function gullMove(dt, yaw, pitch, mf, mr, fast) {
   const A = AV, sy = sin(yaw), cw = cos(yaw), P = ROLE === 4;
@@ -728,7 +745,7 @@ function gullMove(dt, yaw, pitch, mf, mr, fast) {
     const g0 = ground(A.x, 2, A.z); let ty = -1.8; if (g0 > -1e8 && ty < g0 + 0.5) ty = g0 + 0.5;
     A.y += (ty - A.y) * min(1, dt * 4); avTurn(atan2(-cw, sy), 2, dt);
     const sp2 = mf > 0 ? 3.5 : 1.2, nx = A.x + cos(A.hd) * sp2 * dt, nz = A.z + sin(A.hd) * sp2 * dt; if (sdp(nx, A.y, nz) < -0.1 && ground(nx, 2, nz) < -0.6) { A.x = nx; A.z = nz; }
-    if (A.tm <= 0 || ku) { A.mode = 1; A.y = -0.15; A.swal = 2.5; A.sp = 0; A.pitch = 0; if (rnd() < 0.6) { fishCaught++; roleHud(); toast('You caught a fish!'); } else toast('Nothing this time…'); }
+    if (A.tm <= 0 || ku) { A.mode = 1; A.y = -0.15; A.swal = 2.5; A.sp = 0; A.pitch = 0; A.held = rnd() < 0.6; if (A.held) { fishCaught++; roleHud(); toast('You caught a fish!'); } else toast('Nothing this time…'); }
   } else if (A.mode === 2) { // flying: always moving; W speeds up, S slows to land; look up and down to climb and dive, E / Q for a flap up or down
     const want = atan2(-cw, sy); avTurn(want, P ? 1.7 : 2.2, dt);
     const dd = atan2(sin(want - A.hd), cos(want - A.hd));
@@ -786,23 +803,51 @@ function updBaby(dt) {
   if (BB.mode === 0) emit(5, BB.x, BB.y, BB.z, yaw, 0, 0, 0.62, BB.ph, 0.9 * 0.49 + (BB.mv ? 0.5 : 0), 0.5, 11); else emit(6, BB.x, BB.y, BB.z, yaw, BB.pitch, 0, 0.62, BB.ph, 1, 0.5, 11);
 }
 // the chase camera: behind the avatar along the view direction, pulled in where rock is in the way
+// a crab you can steer: it scuttles sideways over the sand and along the seabed, E digs it in (and out again), B snaps the claws at anyone within reach
+function crabMove(dt, yaw, mf, mr, fast) {
+  const A = AV, sy = sin(yaw), cw = cos(yaw);
+  A.dig += clamp(A.digT - A.dig, -dt / 0.9, dt / 1.1); A.pinchT -= dt; A.mv = 0;
+  let dx = sy * mf + cw * mr, dz = -cw * mf + sy * mr; const l = hypot(dx, dz), sp = fast ? 3.6 : 1.7;
+  if (A.dig < 0.05 && l > 0.05) {
+    dx /= l; dz /= l;
+    for (let k = 0; k < 3; k++) {
+      const an = k === 0 ? 0 : k === 1 ? 0.7 : -0.7, c = cos(an), s = sin(an), ex = dx * c - dz * s, ez = dx * s + dz * c;
+      let nx = A.x + ex * sp * dt, nz = A.z + ez * sp * dt; const r = hypot(nx, nz); if (r > 150) { nx *= 150 / r; nz *= 150 / r; } if (nx > 120) nz = nz < -72 ? -72 : nz > 72 ? 72 : nz;
+      const gh = ground(nx, A.y + 1.5, nz);
+      if (gh > -3.5 && gh < A.y + 0.5 && gh > A.y - 0.6) { A.x = nx; A.z = nz; A.y += (gh - A.y) * min(1, dt * 12); A.mv = sp; let d = atan2(ex, ez) - A.byaw; d = atan2(sin(d), cos(d)); A.byaw += clamp(d, -10 * dt, 10 * dt); break; }
+    }
+  }
+  if (A.pinchT > 0) { // turn the claws on whoever is nearest
+    let bd = 3, bx = 0, bz = 0; for (const b of ACT) if (b.k === 'P' || b.k === 'V') { const d = hypot(b.x - A.x, b.z - A.z); if (d < bd) { bd = d; bx = b.x; bz = b.z; } }
+    if (bd < 3) { let d = atan2(-(bz - A.z), bx - A.x) - A.byaw; d = atan2(sin(d), cos(d)); A.byaw += clamp(d, -12 * dt, 12 * dt); }
+  }
+  A.ph += (A.mv * 9 + (A.pinchT > 0 ? 9 : 0)) * dt;
+  F[CX] = A.x; F[CY] = A.y + 0.4 - A.dig * 0.15; F[CZ] = A.z;
+}
+let camClose = false, bitten = 0;
 function placeCamera() {
   const pit = F[PIT], yw = F[YAW], cp = cos(pit), fx = cp * sin(yw), fy = sin(pit), fz = -cp * cos(yw);
-  const D = ROLE === 4 ? 5 : ROLE === 2 ? 4.2 : ROLE === 1 ? 3.6 : 3.2, up = 0.5, ex = F[CX], ey = F[CY], ez = F[CZ];
+  const D = ROLE === 5 ? 1.9 : ROLE === 6 ? 3 : ROLE === 4 ? 5 : ROLE === 2 ? 4.2 : ROLE === 1 ? 3.6 : 3.2, up = 0.5, ex = F[CX], ey = F[CY], ez = F[CZ];
   let t = D;
   for (let s = 0.5; s <= D; s += 0.5) if (sdp(ex - fx * s, ey - fy * s + up * s / D, ez - fz * s) > -0.4) { t = max(s - 0.5, 0.3); break; }
-  EY[0] = ex; EY[1] = ey; EY[2] = ez; F[CX] = ex - fx * t; F[CY] = ey - fy * t + up * t / D; F[CZ] = ez - fz * t; swapped = true;
+  EY[0] = ex; EY[1] = ey; EY[2] = ez; camClose = t < 1.1; F[CX] = ex - fx * t; F[CY] = ey - fy * t + up * t / D; F[CZ] = ez - fz * t; swapped = true;
 }
 const GUARDSEED = (() => { for (const a of Wd.actors) if (a.k === 'F') return a.seed; return 0.3; })();
 function emitAvatar() {
-  if (!ROLE || !TPV) return;
+  if (!ROLE || !TPV || camClose) return;
   const A = AV;
   if (ROLE === 1) {
     const yaw = atan2(-sin(A.hd), cos(A.hd));
-    if (A.mode === 0) emit(5, A.x, A.y, A.z, yaw, 0, 0, 0.4, A.ph, A.alert * 0.49 + (A.mv ? 0.5 : 0), 1.1, 11); else emit(6, A.x, A.y, A.z, yaw, A.pitch, 0, 0.4, A.ph, 1, 1.1, 11);
+    if (A.mode === 0) emit(5, A.x, A.y, A.z, yaw, 0, 0, 0.4, A.ph, A.chg > 0 || A.biteT > 0 ? 2 + (A.biteT > 0 ? 0.99 : 0.5) : A.alert * 0.49 + (A.mv ? 0.5 : 0), 1.1, 11); else emit(6, A.x, A.y, A.z, yaw, A.pitch, 0, 0.4, A.ph, 1, 1.1, 11);
+  } else if (ROLE === 6) {
+    const yaw = atan2(-sin(A.hd), cos(A.hd));
+    if (A.mode === 0) emit(7, A.x, A.y + 0.1, A.z, yaw, 0, 0, 10.4, A.ph, 3 + (A.mv ? 0.99 : 0), 1.1, 11); else emit(7, A.x, A.y, A.z, yaw, A.pitch, 0, 10.4, A.ph, 1, 1.1, 11);
+  } else if (ROLE === 5) {
+    emit(17, A.x, A.y - A.dig * 0.07 * 1.3, A.z, A.byaw, 0, 0, 0.35, A.ph, A.dig > 0.1 ? 2 + (A.digT !== A.dig ? 0.99 : 0) : A.pinchT > 0 ? 1.99 : A.mv ? 0.99 : 0, 1.3, 15);
   } else if (ROLE === 2 || ROLE === 4) {
     const yaw = atan2(-sin(A.hd), cos(A.hd)), air = A.mode === 2, dive = A.mode >= 3, pk = A.swal > 0 ? 0.5 + 0.5 * sin(F[TIME] * 6) : 0;
     const w = dive ? 2 : air ? 1 + A.fl * 0.99 : pk * 0.49 + (A.mv ? 0.5 : 0);
+    if (ROLE === 4 && A.held && A.swal > 1.0 && A.mode === 1) emitBillFish(A.x, A.y, A.z, yaw, 1.3, 0.37);
     if (ROLE === 2) emit(8, A.x, A.y, A.z, yaw, air ? A.pitch : 0, air ? A.roll : 0, 0.4, A.ph, w, 1.25, 13); else emit(16, A.x, A.y, A.z, yaw, air || dive ? A.pitch : 0, air ? A.roll : 0, 5.4, A.ph, w, 1.3, 13);
   } else {
     const spd = hypot(F[VX], F[VZ]);
@@ -833,8 +878,14 @@ function warnVisitors(x, z, r, mine) {
 roleHud();
 function doCall() {
   if (callCd > 0 || !ROLE) return;
-  if (ROLE === 1) { callCd = 1; if (BARK) BARK(0, 0.7, 0); }
+  if (ROLE === 1) { callCd = 1; if (BARK) BARK(0, 0.7, 0); for (const b of ACT) if ((b.k === 'P' || b.k === 'V') && b.pose !== 2 && hypot(b.x - AV.x, b.z - AV.z) < 22) { crabPinchPerson(b, AV.x, AV.z); b.ft = 3 + rnd() * 1.5; } }
   else if (ROLE === 2) { callCd = 1; if (BARK) BARK(0, 0.35, 4); }
+  else if (ROLE === 6) { callCd = 1.5; if (BARK) BARK(0, 0.2, 0); }
+  else if (ROLE === 5) {
+    if (AV.dig > 0.3) return;
+    callCd = 0.7; AV.pinchT = 0.7; if (CLICK) CLICK(0, 0.5);
+    for (const b of ACT) if ((b.k === 'P' || b.k === 'V') && b.pose !== 2 && hypot(b.x - AV.x, b.z - AV.z) < 1.2) { crabPinchPerson(b, AV.x, AV.z); pinched++; roleHud(); toast(['Ouch!', 'Yow! Something pinched me!', 'Hey! A crab!'][rnd() * 3 | 0]); }
+  }
   else if (ROLE === 4) {
     callCd = 1;
     if (AV.mode === 2 && AV.y > 2 && ground(AV.x, 2, AV.z) < -2) { AV.mode = 3; AV.sp = 10; } else if (AV.mode === 1) { AV.mode = 4; AV.tm = 2.6; splash(AV.x, AV.z); } else toast('Fly out over deeper water, then B to dive');
@@ -902,14 +953,84 @@ function updPelican(a, dt, px, pz, py) {
   }
   a.yaw = atan2(-sin(a.hd), cos(a.hd));
 }
+// the fish in a pelican's bill: at the tip, hanging down and wriggling
+function emitBillFish(x, y, z, yaw, sc, seed) {
+  const t = F[TIME] * 14 + seed * 9, fx = cos(yaw), fz = -sin(yaw);
+  emit(18, x + fx * 1.12 * sc, y + 0.66 * sc, z + fz * 1.12 * sc, yaw, -0.9 + sin(t) * 0.35, sin(t * 0.7) * 0.4, seed, 0, 0, 1.15, 10);
+}
 function emitPelican(a) {
   const st = a.st, w = st === 3 || st === 4 ? 2 : st === 2 || st === 6 ? 1 + a.amt * 0.99 : a.pk * 0.49;
   emit(16, a.x, a.y, a.z, a.yaw, st >= 2 && st !== 5 ? a.pitch : 0, st === 2 || st === 6 ? a.roll : 0, a.seed, a.ph, w, a.sc, 13);
+  if (st === 5 && a.caught && a.tm > 1.1) emitBillFish(a.x, a.y, a.z, a.yaw, a.sc, a.seed);
+}
+// crabs: 0 scurrying about sideways, 1 digging in, 2 buried (eyes peeking out), 3 digging out, 4 standing its ground with the claws up and pinching, 5 running off.
+// A timid crab runs from a human and buries itself; a bold one threatens it, and pinches if it comes too close.
+function crabPinchPerson(b, cx, cz) { b.ft = 2.6; b.fx = cx; b.fz = cz; if (b.k === 'V') b.st = 2; else { b.st = 1; b.pose = 0; } }
+function updCrab(a, dt, px, pz, py) {
+  const dp = hypot(a.x - px, a.z - pz); let td = dp, tx = px, tz = pz, who = null;
+  for (const b of ACT) if ((b.k === 'P' || b.k === 'V') && b.pose !== 2) { const d = hypot(b.x - a.x, b.z - a.z); if (d < td) { td = d; tx = b.x; tz = b.z; who = b; } }
+  if (py < -3.5 && who === null) td = 1e5;   // somebody swimming deep does not bother it
+  a.tm -= dt; a.cd -= dt; let sp = 0;
+  if (td > 9) a.seen = 0;
+  if (a.st === 0) { // scurry about
+    if (td < 3 && !a.seen) { a.seen = 1; a.mood = rnd() < 0.45 ? 1 : 0; }
+    if (td < 3) { if (a.mood) { a.st = 4; a.cl = 0; } else { a.st = 5; a.tm = 1.6; } }
+    else {
+      if (a.tm < 0) { if (rnd() < 0.25) { a.st = 1; } else { a.wx = a.x + rr(-5, 5); a.wz = a.z + rr(-5, 5); a.tm = 2 + rnd() * 3; } }
+      if (hypot(a.wx - a.x, a.wz - a.z) > 0.25) { sp = 0.55; if (!stepActor(a, a.wx - a.x, a.wz - a.z, sp, dt, -2.8)) { sp = 0; a.tm = 0; } else turnTo(a, atan2(a.mx, a.mz), 8, dt); }
+    }
+  } else if (a.st === 5) { // run, sideways and fast, away from the human, then dig in
+    sp = 1.5; if (!stepActor(a, a.x - tx, a.z - tz, sp, dt, -2.8)) sp = 0; else turnTo(a, atan2(a.mx, a.mz), 12, dt);
+    if (a.tm < 0) a.st = 1;
+  } else if (a.st === 1) { a.dig += dt / 1.1; if (a.dig >= 1) { a.dig = 1; a.st = 2; a.tm = 8 + rnd() * 18; } }
+  else if (a.st === 2) { if (a.tm < 0 || td < 0.8) { a.st = 3; a.mood = td < 2 ? 1 : a.mood; } }
+  else if (a.st === 3) { a.dig -= dt / 0.9; if (a.dig <= 0) { a.dig = 0; a.st = td < 3 ? 4 : 0; a.tm = 1; } }
+  else { // 4: face the human, claws up, snap; pinch whoever comes within reach
+    turnTo(a, atan2(-(tz - a.z), tx - a.x), 9, dt); a.cl += (1 - a.cl) * min(1, dt * 8); a.ph += dt * 9;
+    if (td < 0.7 && a.cd < 0) {
+      a.cd = 1.7; const pan = clamp(((a.x - px) * F[RX] + (a.z - pz) * F[RZ]) / (dp + 1), -1, 1); if (CLICK) CLICK(pan, 0.5 * clamp(1.2 - dp / 12, 0, 1));
+      if (who) crabPinchPerson(who, a.x, a.z); else { hurt(a.x, a.z, 3.5); toast('Ouch! A crab pinched you!'); }
+    }
+    if (td > 3.2) { a.st = 0; a.cl = 0; a.tm = 1; a.seen = 0; }
+    if (td > 1.6 && a.mood === 0) { a.st = 5; a.tm = 1.4; a.cl = 0; }
+  }
+  if (a.st !== 4) a.cl *= 1 - min(1, dt * 6);
+  a.amt += ((sp > 0 ? 1 : 0) - a.amt) * min(1, dt * 10); a.ph += sp * 9 * dt;
+}
+function emitCrab(a) {
+  const st = a.st, w = st === 4 ? 1 + a.cl * 0.99 : st >= 1 && st <= 3 ? 2 + (st === 1 || st === 3 ? 0.99 : 0) : a.amt * 0.99;
+  emit(17, a.x, a.y - a.dig * 0.07 * a.sc, a.z, a.yaw, 0, 0, a.seed, a.ph, w, a.sc, 15);
+}
+// contact shadows: a soft dark disc under every person and animal on the ground (round, or long for sea lions and people lying down)
+const BLM = [BLOB, BLOBL], BLI = BLM.map(() => new Float32Array((NACT + 12) * 12)), BLN = new Uint32Array(2);
+const BLB = BLM.map(() => device.createBuffer({ size: (NACT + 12) * 48, usage: BU.VERTEX | BU.COPY_DST }));
+const drawBlobs = (r) => { r.setPipeline(pBlob); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32'); for (let s = 0; s < 2; s++) if (BLN[s]) { r.setVertexBuffer(1, BLB[s]); r.drawIndexed(BLM[s].ib.length, BLN[s], BLM[s].i0, BLM[s].v0, 0); } };
+function shadowBlob(long, x, y, z, sc, yaw, h) {
+  const s = long ? 1 : 0, o = BLN[s]++ * 12, f = BLI[s];
+  setQ(f, o, yaw, 0, 0); f[o] = x - 0.13 * h; f[o + 1] = y + 0.04; f[o + 2] = z + 0.12 * h; f[o + 3] = sc; f[o + 8] = 12; f[o + 9] = 0.5; f[o + 10] = 0; f[o + 11] = 0;
+}
+function addBlobs() {
+  for (let i = 0; i < NACT; i++) {
+    const a = ACT[i], k = a.k;
+    if (k === 'P' || k === 'V') { if (a.pose === 2 && k === 'P') shadowBlob(1, a.x, a.y, a.z, 1.0, a.yaw - PI / 2, 0.3); else shadowBlob(0, a.x, a.y + (a.st === 0 && a.pose === a.hpose ? a.lift : 0), a.z, (a.pose === 1 ? 0.55 : 0.4) * a.sc, 0, 1.7 * a.sc * (a.pose === 0 ? 1 : 0.4)); }
+    else if (k === 'L') shadowBlob(1, a.x, a.y, a.z, 0.8 * a.sc, a.yaw, 0.6 * a.sc);
+    else if (k === 'X') { if (a.dig < 0.5) shadowBlob(0, a.x, a.y, a.z, 0.12 * a.sc, 0, 0.1); }
+    else if (k === 'C') shadowBlob(0, a.x, a.y, a.z, 0.1 * a.sc, 0, 0.1);
+    else if ((k === 'G' && a.st === 0) || (k === 'Q' && a.st === 0)) shadowBlob(0, a.x, a.y, a.z, (k === 'Q' ? 0.4 : 0.22) * a.sc, 0, 0.5);
+  }
+  if (ROLE === 1 && TPV) { if (AV.mode === 0) shadowBlob(1, AV.x, AV.y, AV.z, 0.9, atan2(-sin(AV.hd), cos(AV.hd)), 0.6); if (BB.mode === 0) shadowBlob(1, BB.x, BB.y, BB.z, 0.45, atan2(-sin(BB.hd), cos(BB.hd)), 0.3); }
+  else if (ROLE === 2 && TPV && AV.mode === 0) shadowBlob(0, AV.x, AV.y, AV.z, 0.26, 0, 0.5);
+  else if (ROLE === 4 && TPV && AV.mode === 0) shadowBlob(0, AV.x, AV.y, AV.z, 0.42, 0, 0.5);
+  else if (ROLE === 5 && TPV) shadowBlob(0, AV.x, AV.y, AV.z, 0.16, 0, 0.1);
+  else if (ROLE === 6 && TPV && AV.mode === 0) shadowBlob(1, AV.x, AV.y, AV.z, 0.65, atan2(-sin(AV.hd), cos(AV.hd)), 0.3);
+  else if (ROLE === 3 && TPV && walk) shadowBlob(0, PL[0], PL[1] - 1.7, PL[2], 0.4, 0, 1.7);
+  for (let s = 0; s < 2; s++) if (BLN[s]) Q.writeBuffer(BLB[s], 0, BLI[s], 0, BLN[s] * 12);
 }
 function updateActors(dt) {
   if (!ACTINIT) { ACTINIT = true; for (const a of ACT) {
     if (a.k === 'P' || a.k === 'L' || a.k === 'C' || a.k === 'F' || a.k === 'V') { a.y = ground(a.x, a.high || a.k === 'C' ? 12 : 4, a.z); if (a.k === 'V') a.tm = 6 + a.seed * 30; }
     else if (a.k === 'K' || a.k === 'U' || a.k === 'R') { a.y = -0.05; a.sp = 0; a.tm = 2 + a.seed * 10; }
+    else if (a.k === 'X') { a.y = ground(a.x, 4, a.z); if (a.y < -2.7) { a.x += 5; a.y = ground(a.x, 4, a.z); } if (a.st === 2) { a.dig = 1; a.tm = 5 + a.seed * 20; } else a.tm = a.seed * 4; }
     else if (a.k === 'Q') {
       if (a.st === 0) { a.y = a.hy = ground(a.x, a.y0, a.z); a.tm = 20 + a.seed * 40; } else if (a.st === 1) { a.y = -0.15; a.tm = 8 + a.seed * 12; }
       else { const f = a.seed % 1; a.y = a.fy = 9 + f * 3; a.hd = f * 20; a.dir = f < 0.5 ? -1 : 1; a.sp = 7; a.tm = 5 + f * 5; a.fish = 2; }
@@ -917,19 +1038,20 @@ function updateActors(dt) {
     else if (a.k === 'G') { if (a.st === 0) a.y = ground(a.x, 4, a.z); else if (a.st === 1) a.y = -0.15; else { a.y = a.fy = 9 + a.seed * 4; a.hd = a.seed * 20; a.dir = a.seed < 0.5 ? -1 : 1; a.sp = 7; a.tm = 6 + a.seed * 12; } }
     else a.y = -0.3;
   } }
-  const far = ROLE === 1 || ROLE === 2 || ROLE === 4 ? 1e5 : 0, px = PL[0] + far, pz = PL[2], py = PL[1];
-  SLN.fill(0);
+  const far = ROLE === 1 || ROLE === 2 || ROLE === 4 || ROLE === 5 || ROLE === 6 ? 1e5 : 0, px = PL[0] + far, pz = PL[2], py = PL[1];
+  SLN.fill(0); BLN.fill(0);
   for (let i = 0; i < NACT; i++) {
     const a = ACT[i], k = a.k;
     if (k === 'V') updVisitor(a, dt, px, pz, py); else if (k === 'P') updPerson(a, dt, px, pz, py); else if (k === 'L') updLion(a, dt, px, pz, py); else if (k === 'E') updSeal(a, dt, px, pz, py);
     else if (k === 'G') updGull(a, dt, px, pz, py); else if (k === 'C') updChip(a, dt, px, pz, py); else if (k === 'F') updGuard(a, dt, px, pz, py);
-    else if (k === 'K' || k === 'U') updPaddler(a, dt); else if (k === 'R') updSurfer(a, dt); else if (k === 'Q') updPelican(a, dt, px, pz, py); else updSwimmer(a, dt, px, pz, py);
+    else if (k === 'K' || k === 'U') updPaddler(a, dt); else if (k === 'R') updSurfer(a, dt); else if (k === 'Q') updPelican(a, dt, px, pz, py); else if (k === 'X') updCrab(a, dt, px, pz, py); else updSwimmer(a, dt, px, pz, py);
   }
   separate();
   for (let i = 0; i < NACT; i++) {
     const a = ACT[i], k = a.k;
     if (k === 'F' || k === 'K' || k === 'U' || k === 'R') { emitCraft(a); continue; }
     if (k === 'Q') { emitPelican(a); continue; }
+    if (k === 'X') { emitCrab(a); continue; }
     // swimmers just turned into land lions (or back) are drawn this frame in their new slot
     const slot = k === 'P' ? a.pose : k === 'V' ? 0 : k === 'N' ? 4 : k === 'L' ? 5 : k === 'S' ? 6 : k === 'E' ? 7 : k === 'G' ? 8 : 9, o = SLN[slot]++ * 12, f = SLI[slot];
     if (k === 'P' || k === 'V') { f[o + 4] = 0; f[o + 5] = sin(a.yaw * 0.5); f[o + 6] = 0; f[o + 7] = cos(a.yaw * 0.5); } else setQ(f, o, a.yaw, k === 'S' || k === 'E' || k === 'G' ? a.pitch : 0, k === 'G' ? a.roll : 0);
@@ -937,7 +1059,7 @@ function updateActors(dt) {
     f[o + 8] = k === 'P' || k === 'N' || k === 'V' ? 10 : k === 'G' ? 13 : k === 'C' ? 14 : 11; f[o + 9] = a.seed; f[o + 10] = a.ph;
     f[o + 11] = k === 'P' ? a.pose + a.amt * 0.99 : k === 'V' ? a.amt * 0.99 : k === 'N' ? 4 + a.amt * 0.99 : k === 'L' ? (a.st >= 3 ? 2 + a.lg * 0.99 : a.amt * 0.49 + (a.mv ? 0.5 : 0)) : k === 'G' ? (a.st >= 2 ? 1 + a.amt * 0.99 : a.pk * 0.49 + (a.mv ? 0.5 : 0)) : k === 'C' ? a.pose + a.amt * 0.99 : 1;
   }
-  emitAvatar(); updBaby(dt); emitSplashes(dt);
+  emitAvatar(); updBaby(dt); emitSplashes(dt); addBlobs();
   for (let s = 0; s < SLM.length; s++) if (SLN[s]) Q.writeBuffer(SLB[s], 0, SLI[s], 0, SLN[s] * 12);
 }
 const ibChunk = Wd.chunks.map((c) => buf(c.data, BU.VERTEX)), ibProp = Wd.props.map((c) => buf(c.data, BU.VERTEX));
@@ -1114,7 +1236,7 @@ function render() {
   r.setPipeline(pSolid); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
   for (let i = 0; i < 12; i++) { const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
   if (cy > -6) drawDeco(r);
-  drawActors(r);
+  drawActors(r); drawBlobs(r);
   for (let i = 0; i < NCHUNK; i++) {
     const c = Wd.chunks[i], big = i > 2 && i < 6; r.setVertexBuffer(1, ibChunk[i]);
     drawCells(r, c.start, c.lo, c.hi, 3, meshes[14 + i], 0, 0, i > 5 ? 30 : big ? 40 : 96);
@@ -1170,8 +1292,28 @@ function sdp(wx, wy, wz) {
   const p = a + (cv(ix + 1, iy, iz) - a) * u, q = b + (cv(ix + 1, iy + 1, iz) - b) * u, r = c + (cv(ix + 1, iy, iz + 1) - c) * u, s = d + (cv(ix + 1, iy + 1, iz + 1) - d) * u;
   const e = p + (q - p) * v; return (e + (r + (s - r) * v - e) * (z - iz)) / 127;
 }
+// flat perches (tree crowns, the lifeguard tower's roof and deck) that birds can stand on: [x, topY, z, radius] discs and [x0, x1, z0, z1, topY] boxes
+var PERCH = [], PERCHB = [], perchOn = false;
+function buildPerches() {
+  const D = Wd.deco;
+  for (const [k, key] of [[0, 'p'], [1, 't1'], [2, 't2']]) for (let i = 0; i < D[k].length; i += 12) {
+    const x = D[k][i], y = D[k][i + 1], z = D[k][i + 2], sc = D[k][i + 3], a = 2 * atan2(D[k][i + 5], D[k][i + 7]), c = cos(a), s = sin(a);
+    for (const q of CROWN[key]) PERCH.push([x + (q[0] * c + q[2] * s) * sc, y + q[1] * sc, z + (-q[0] * s + q[2] * c) * sc, q[3] * sc]);
+  }
+  for (let i = 0; i < D[10].length; i += 12) {
+    const x = D[10][i], y = D[10][i + 1], z = D[10][i + 2], sc = D[10][i + 3];
+    PERCHB.push([x - 4.9 * sc, x + 2.1 * sc, z - 2.5 * sc, z + 2.5 * sc, y + 3.8 * sc], [x - 4.2 * sc, x - 1.7 * sc, z - 2.3 * sc, z + 2.3 * sc, y + 1.05 * sc]);
+  }
+}
 // height of the ground under (x, z), searching down from y0; -1e9 where there is none within 9 m
 function ground(x, y0, z) {
+  const g = ground0(x, y0, z); if (!perchOn) return g;
+  let best = g;
+  for (const p of PERCH) if (p[1] <= y0 + 0.05 && p[1] > best && (x - p[0]) ** 2 + (z - p[2]) ** 2 < p[3] * p[3]) best = p[1];
+  for (const b of PERCHB) if (b[4] <= y0 + 0.05 && b[4] > best && x > b[0] && x < b[1] && z > b[2] && z < b[3]) best = b[4];
+  return best;
+}
+function ground0(x, y0, z) {
   const s0 = sdp(x, y0, z); if (s0 > 0) return y0 + s0;
   let p = s0;
   for (let y = y0 - 0.25; y > y0 - 9; y -= 0.25) { const s = sdp(x, y, z); if (s > 0) return y + 0.25 * s / (s - p); p = s; }
@@ -1233,7 +1375,7 @@ function frame(now) {
     const ax = lkx * kq, ay = lky * kq; lkx -= ax; lky -= ay; l2x += ax; l2y += ay;
     const dyw = l2x * kq, dpt = l2y * kq; l2x -= dyw; l2y -= dpt;
     const yaw = F[YAW] + dyw; let pitch = F[PIT] - dpt; pitch = pitch < -1.55 ? -1.55 : pitch > 1.55 ? 1.55 : pitch;
-    if (ROLE === 1 || ROLE === 2 || ROLE === 4) { F[YAW] = yaw; F[PIT] = pitch; lookMove(dt, yaw, pitch); } else {
+    if (ROLE === 1 || ROLE === 2 || ROLE === 4 || ROLE === 5 || ROLE === 6) { F[YAW] = yaw; F[PIT] = pitch; lookMove(dt, yaw, pitch); } else {
     // three ways to move: swimming, treading water with the head out (`above`), and walking (`walk`), where forward
     // follows the ground and the eye stays 1.7 m over it
     const flat = walk || above, fast = ks || tN > 1;
@@ -1284,11 +1426,11 @@ function frame(now) {
 const key = (e, v) => {
   switch (e.code) {
     case 'KeyW': kf = v; break; case 'KeyS': kb = v; break; case 'KeyA': kl = v; break; case 'KeyD': kr = v; break;
-    case 'KeyE': ku = v; break; case 'KeyQ': kd = v; break; case 'ShiftLeft': case 'ShiftRight': ks = v; break;
+    case 'KeyE': ku = v; if (v && !e.repeat && ROLE === 5) AV.digT = AV.digT ? 0 : 1; if (v && !e.repeat && ROLE === 1 && AV.mode === 0 && !(AV.chg > 0)) { AV.chg = 1.6; if (BARK) BARK(0, 0.8, 1); } break; case 'KeyQ': kd = v; break; case 'ShiftLeft': case 'ShiftRight': ks = v; break;
     default: if (v && !e.repeat) {
       if (e.code === 'KeyH') { hud = !hud; hTot = 0; hPer = 1e9; info.textContent = ''; }
       else if (e.code === 'KeyM') mute();
-      else if (e.code === 'KeyT') setRole((ROLE + 1) % 5);
+      else if (e.code === 'KeyT') setRole((ROLE + 1) % 7);
       else if (e.code === 'KeyV') { if (ROLE) TPV = !TPV; }
       else if (e.code === 'KeyB') doCall();
       else if (e.code === 'Escape') ui(true);

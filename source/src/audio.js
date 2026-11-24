@@ -3,7 +3,7 @@
 // ============================================================================
 // A fixed Web Audio graph, built on the first click / key / touch and driven by a 10 Hz timer, not the frame loop.
 // Layers: rumble, surface wash, water rush (follows camera speed), drone, bubbles, chimes and distant whale calls.
-let AC, OUT, BARK = null, WHISTLE = null, muted = false; // BARK(pan, volume): a sea lion's bark, once the sound is running
+let AC, OUT, BARK = null, WHISTLE = null, CLICK = null, muted = false; // BARK(pan, volume): a sea lion's bark, once the sound is running
 const VOL = 0.78; // master level: about -18.5 LUFS, peaks near -5.5 dBFS
 function mkSound(ac) {
   const sr = ac.sampleRate;
@@ -28,6 +28,9 @@ function mkSound(ac) {
   src(0.63, BQ('bandpass', 420, 0.5, wave), rushF); lfo(0.09, 0.3, wave.gain); lfo(0.151, 0.25, wave.gain);
   // drone: stacked fifths on D, each note a pair of slightly detuned sines that slowly beat
   const pad = G(1, out, G(1.5, wet));
+  // above the water: surf rolling in and out, and a breath of wind
+  const surf = G(0, out); src(0.8, BQ('lowpass', 1500, 0.6, surf)); lfo(0.13, 0.3, surf.gain); lfo(0.071, 0.2, surf.gain);
+  const wind = G(0, out); src(1.3, BQ('bandpass', 420, 0.5, wind)); lfo(0.05, 0.12, wind.gain);
   [73.42, 110, 164.81, 246.94, 369.99].forEach((f, i) => { const g = G(0.022 - i * 0.003, pad); N(OscillatorNode, { frequency: f }, g); N(OscillatorNode, { frequency: f + rr(0.03, 0.11) }, g); });
   // pooled voices: oscillator -> envelope -> pan -> dry + reverb
   const pool = (n, send, type) => Array.from({ length: n }, () => { const p = N(StereoPannerNode, {}, out, G(send, wet)), g = G(0, p); return { p, g, o: N(OscillatorNode, { type }, g) }; });
@@ -61,6 +64,15 @@ function mkSound(ac) {
       o.start(t); o.stop(t + 0.6);
     }
   };
+  // a crab's claws snapping shut: two dry clicks
+  CLICK = (pan, vol) => {
+    for (let k = 0, t = ac.currentTime + 0.02; k < 2; k++, t += 0.09) {
+      const b = new AudioBufferSourceNode(ac, { buffer: nb, playbackRate: 6 }), f = new BiquadFilterNode(ac, { type: 'bandpass', frequency: 3200, Q: 4 }), g = new GainNode(ac, { gain: 0 }), p = new StereoPannerNode(ac, { pan });
+      b.connect(f); f.connect(g); g.connect(p); p.connect(out);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * 3, t + 0.004); g.gain.setTargetAtTime(0, t + 0.01, 0.012);
+      b.start(t, rnd() * 5); b.stop(t + 0.12);
+    }
+  };
   // the lifeguard's whistle: two sharp blasts
   WHISTLE = (pan, vol) => {
     for (let k = 0, t = ac.currentTime + 0.03; k < 2; k++, t += 0.45) {
@@ -71,7 +83,7 @@ function mkSound(ac) {
     }
   };
   const NOTES = [0, 2, 5, 7, 9, 12, 14, 17, 19]; // D major pentatonic, in semitones above A4
-  let lt = ac.currentTime, tB = lt + 1.5, tC = lt + 5, tW = lt + 12, lx = F[CX], ly = F[CY], lz = F[CZ];
+  let lt = ac.currentTime, tG = lt + 4, tS = lt + 12, tB = lt + 1.5, tC = lt + 5, tW = lt + 12, lx = F[CX], ly = F[CY], lz = F[CZ];
   out.gain.setTargetAtTime(VOL, lt, 1);
   return () => {
     const now = ac.currentTime, t = now + 0.05, dt = now - lt;
@@ -79,14 +91,20 @@ function mkSound(ac) {
     let v = hypot(F[CX] - lx, F[CY] - ly, F[CZ] - lz) / dt; if (v > 60) v = 0; // ignore jumps to a viewpoint
     lt = now; lx = F[CX]; ly = F[CY]; lz = F[CZ];
     rush.gain.setTargetAtTime(0.5 * pow(min(v / 26, 1), 1.2), t, 0.3); rushF.frequency.setTargetAtTime(220 + v * 14, t, 0.3);
-    const s = clamp(1 + ly / 30, 0, 1); wash.gain.setTargetAtTime(0.25 + 0.55 * s * s, t, 0.5);
-    if (t > tB) { // a burst of 1-6 bubbles: short rising blips, smaller bubbles higher and shorter
+    const air = ly > 0.05, s = clamp(1 + ly / 30, 0, 1); wash.gain.setTargetAtTime(air ? 0.04 : 0.25 + 0.55 * s * s, t, 0.5);
+    rum.gain.setTargetAtTime(air ? 0.03 : 0.34, t, 0.6); pad.gain.setTargetAtTime(air ? 0.08 : 1, t, 0.8);
+    surf.gain.setTargetAtTime(air ? 0.34 : 0.03, t, 0.5); wind.gain.setTargetAtTime(air ? 0.1 + 0.05 * clamp(ly / 12, 0, 1) : 0, t, 0.8);
+    if (air) { // gulls overhead and the sea lions down the beach
+      if (t > tG) { BARK(rr(-0.8, 0.8), 0.1, 4); tG = t + rr(6, 18); }
+      if (t > tS && lx > 90) { BARK(rr(-0.8, 0.8), 0.12, 0); tS = t + rr(14, 40); }
+    }
+    if (t > tB && !air) { // a burst of 1-6 bubbles: short rising blips, smaller bubbles higher and shorter
       let tt = t;
       for (let n = 1 + rnd() * rnd() * 6 | 0; n--;) { const f = rr(380, 1300); play(bub, tt, f, f * rr(1.4, 2.2), 0.05 + 40 / f, rr(0.03, 0.08), 0.006); tt += rr(0.07, 0.2); }
       tB = tt + rr(0.5, 5);
     }
-    if (t > tC) { const f = 440 * pow(2, NOTES[rnd() * 9 | 0] / 12); play(chime, t, f, f, 5, rr(0.02, 0.04), 0.03); tC = t + rr(2.5, 9); }
-    if (t > tW) { // a phrase of 2-3 slow glides
+    if (t > tC && !air) { const f = 440 * pow(2, NOTES[rnd() * 9 | 0] / 12); play(chime, t, f, f, 5, rr(0.02, 0.04), 0.03); tC = t + rr(2.5, 9); }
+    if (t > tW && !air) { // a phrase of 2-3 slow glides
       let tt = t;
       for (let n = 2 + rnd() * 2 | 0; n--;) { const f = rr(170, 380), d = rr(1.6, 3.2); play(whale, tt, f, f * rr(0.6, 1.7), d, 0.08, d * 0.4); tt += d * 0.8; }
       tW = tt + rr(20, 50);
