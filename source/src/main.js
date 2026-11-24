@@ -676,7 +676,7 @@ const AV = { x: 0, y: 0, z: 0, hd: PI, pitch: 0, roll: 0, sp: 0, ph: 0, mode: 0,
 const HUDR = document.createElement('div');
 HUDR.style.cssText = 'position:fixed;top:1em;left:50%;transform:translateX(-50%);padding:.35em .9em;background:#0008;color:#e8fbff;font:600 .85em system-ui,sans-serif;border-radius:2em;pointer-events:none;z-index:5;white-space:nowrap';
 document.body.append(HUDR);
-function roleHud() { HUDR.textContent = ROLES[ROLE] + (ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
+function roleHud() { if (typeof tbUpdate === 'function') tbUpdate(); HUDR.textContent = ROLES[ROLE] + (ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
 function setRole(r) {
   if (ROLE === 0) { DV[0] = F[CX]; DV[1] = F[CY]; DV[2] = F[CZ]; DV[3] = F[YAW]; DV[4] = F[PIT]; DV[5] = walk ? 1 : 0; DV[6] = above ? 1 : 0; }
   ROLE = r; if (!PERCH.length) buildPerches(); perchOn = r === 2 || r === 4; walk = above = false; F[VX] = F[VY] = F[VZ] = 0; TPV = true; swapped = false; AV.vx = AV.vy = AV.vz = AV.sp = AV.mv = AV.pitch = AV.roll = 0;
@@ -1434,13 +1434,25 @@ const key = (e, v) => {
       else if (e.code === 'KeyV') { if (ROLE) TPV = !TPV; }
       else if (e.code === 'KeyB') doCall();
       else if (e.code === 'Escape') ui(true);
-      else if (e.code >= 'Digit1' && e.code <= 'Digit8') { if (ROLE) setRole(0); lookAt(...POSES[e.code.charCodeAt(5) - 49]); }
+      else if (e.code >= 'Digit1' && e.code <= 'Digit8') { if (ROLE) setRole(0); vpI = e.code.charCodeAt(5) - 49; lookAt(...POSES[vpI]); }
     }
   }
 };
 // behind the menu only the stats and mute keys work
 addEventListener('keydown', (e) => { if (menu && e.code !== 'KeyH' && e.code !== 'KeyM') return; sound(); key(e, 1); });
 addEventListener('keyup', (e) => key(e, 0));
+// touch buttons: next viewpoint, next role, view, the animal's call (B) and its special action (E: charge, dig, take off)
+var vpI = 7;
+const TB = [1, 2, 3, 4, 5].map((i) => $('t' + i)), SPECIAL = { 1: 'Charge', 2: 'Take off', 4: 'Take off', 5: 'Dig' };
+const TLAB = ['', 'Bark', 'Squawk', 'Warn', 'Dive', 'Pinch', 'Grunt'];
+var tbUpdate = () => { TB[1].textContent = ROLE ? 'Role: ' + ROLES[ROLE] : 'Role'; TB[2].hidden = !ROLE; TB[3].hidden = !ROLE; TB[3].textContent = TLAB[ROLE]; TB[4].hidden = !SPECIAL[ROLE]; TB[4].textContent = SPECIAL[ROLE] || ''; };
+const tbOn = (b, f) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound(); f(e); });
+tbOn(TB[0], () => { if (ROLE) setRole(0); vpI = (vpI + 1) % 8; lookAt(...POSES[vpI]); });
+tbOn(TB[1], () => setRole((ROLE + 1) % 7));
+tbOn(TB[2], () => { if (ROLE) TPV = !TPV; });
+tbOn(TB[3], () => doCall());
+tbOn(TB[4], () => { key({ code: 'KeyE', repeat: false }, 1); const up = () => { key({ code: 'KeyE' }, 0); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); }; addEventListener('pointerup', up); addEventListener('pointercancel', up); });
+tbUpdate();
 const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; tId = -1; tN = 0; };
 const capture = () => { sound(); const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
 canvas.addEventListener('click', capture);
@@ -1481,7 +1493,7 @@ $('q').querySelectorAll('button').forEach((b, i) => { if (i === 2 - LV) b.classN
 document.addEventListener('pointerlockchange', () => ui(!document.pointerLockElement));
 
 // draw the first frame and wait for the GPU to finish it (pipelines get compiled on first use) before the reveal
-lookAt(...POSES[0]);
+lookAt(...POSES[7]); vpI = 7;
 await say('Letting the light in…', 1, 400);
 render(); await Q.onSubmittedWorkDone();
 setTimeout(keep, 15e3, 'cqLoad', ''); // the load counts as survived after 15 s of frames

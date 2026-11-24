@@ -112,6 +112,11 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
   box-shadow: inset 0 0 0 2px #7ff3ff, 0 .3em 1em #0009; font-size: 1.3em; color: #e8fbff; opacity: .8;
 }
 .g #o { display: flex; }
+/* touch buttons: switch place and role, trigger the animal's call and special action */
+#t { position: absolute; left: .6em; right: .6em; bottom: .6em; display: none; justify-content: space-between; gap: .4em; pointer-events: none; }
+#t button { pointer-events: auto; flex: 0 1 auto; padding: .7em .9em; font-size: .8em; opacity: .85; user-select: none; -webkit-user-select: none; touch-action: none; }
+#t button[hidden] { display: none; }
+@media (pointer: coarse) { .g #t { display: flex; } }
 .p #o { display: none; }
 #i {
   position: absolute; top: 1em; left: 1.2em; margin: 0; font: .8em/1.6 ui-monospace, Consolas, monospace;
@@ -144,7 +149,7 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
           <i><b>H</b></i>Stats
         </p>
       </div>
-      <p id=h>Hold to swim forward · slide to steer · second finger to go faster</p>
+      <p id=h>Hold to swim forward · slide to steer · second finger to go faster · buttons: place, role, view, call and action</p>
     </div>
   </div>
   <p id=f>
@@ -153,6 +158,7 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
   </p>
 </div>
 <button id=o aria-label=Menu>≡</button>
+<div id=t><button id=t1>Place</button><button id=t2>Role</button><button id=t3>View</button><button id=t4>Call</button><button id=t5>Action</button></div>
 <pre id=i></pre>
 <script>
 /*SCRIPT*/
