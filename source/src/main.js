@@ -736,7 +736,7 @@ function lionMove(dt, yaw, pitch, mf, mr, fast) {
   }
 }
 function lookMove(dt, yaw, pitch) {
-  const fast = ks || tN > 1, mf = tId >= 0 ? 0.7 : kf - kb, mr = kr - kl;
+  const fast = ks || tN > 1, mf = tId >= 0 && !TOUCHUI ? 0.7 : kf - kb, mr = kr - kl;
   if (ROLE === 1 || ROLE === 6) lionMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 5) crabMove(dt, yaw, mf, mr, fast); else gullMove(dt, yaw, pitch, mf, mr, fast);
 }
 function gullMove(dt, yaw, pitch, mf, mr, fast) {
@@ -1386,7 +1386,7 @@ function frame(now) {
     // follows the ground and the eye stays 1.7 m over it
     const flat = walk || above, fast = ks || tN > 1;
     const sp = walk ? (fast ? 7.5 : 3.6) * (1 - 0.45 * sstep(-0.2, -1.2, F[GH])) : above ? (fast ? 9 : 4) : fast ? 26 : 7;
-    const k = 1 - exp(-dt * 4.5), mf = tId >= 0 ? 0.7 : kf - kb, mr = kr - kl, mu = ku - kd, cp = flat ? 1 : cos(pitch), sy = sin(yaw), cw = cos(yaw);
+    const k = 1 - exp(-dt * 4.5), mf = tId >= 0 && !TOUCHUI ? 0.7 : kf - kb, mr = kr - kl, mu = ku - kd, cp = flat ? 1 : cos(pitch), sy = sin(yaw), cw = cos(yaw);
     const vx = F[VX] + ((sy * cp * mf + cw * mr) * sp - F[VX]) * k, vz = F[VZ] + ((-cw * cp * mf + sy * mr) * sp - F[VZ]) * k;
     let vy = flat ? 0 : F[VY] + ((sin(pitch) * mf + mu) * sp - F[VY]) * k;
     let x = F[CX] + vx * dt, y = F[CY] + vy * dt, z = F[CZ] + vz * dt, xv = vx, zv = vz;
@@ -1447,6 +1447,14 @@ const key = (e, v) => {
 // behind the menu only the stats and mute keys work
 addEventListener('keydown', (e) => { if (menu && e.code !== 'KeyH' && e.code !== 'KeyM') return; sound(); key(e, 1); });
 addEventListener('keyup', (e) => key(e, 0));
+if (TOUCHUI) document.documentElement.classList.add('tc');
+// direction pad: held buttons drive W A S D, the middle one toggles running
+const hold = (b, f) => { const on = (e) => { e.preventDefault(); e.stopPropagation(); sound(); b.setPointerCapture?.(e.pointerId); f(1); }, off = (e) => { e.preventDefault(); f(0); };
+  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off); };
+hold($('dU'), (v) => { kf = v; }); hold($('dD'), (v) => { kb = v; }); hold($('dL'), (v) => { kl = v; }); hold($('dR'), (v) => { kr = v; });
+$('dS').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound(); ks = ks ? 0 : 1; $('dS').className = ks ? 'on' : ''; });
+// with ?touch on a computer, dragging the mouse over the scene looks around
+if (TOUCHUI && !mob) { let dn = false; canvas.addEventListener('mousedown', () => { dn = true; }); addEventListener('mouseup', () => { dn = false; }); addEventListener('mousemove', (e) => { if (dn) { mdx += e.movementX; mdy += e.movementY; } }); }
 // touch buttons: next viewpoint, next role, view, the animal's call (B) and its special action (E: charge, dig, take off)
 var vpI = 7;
 const TB = [1, 2, 3, 4, 5].map((i) => $('t' + i)), SPECIAL = { 1: 'Charge', 2: 'Take off', 4: 'Take off', 5: 'Dig' };
@@ -1459,8 +1467,8 @@ tbOn(TB[2], () => { if (ROLE) TPV = !TPV; });
 tbOn(TB[3], () => doCall());
 tbOn(TB[4], () => { key({ code: 'KeyE', repeat: false }, 1); const up = () => { key({ code: 'KeyE' }, 0); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); }; addEventListener('pointerup', up); addEventListener('pointercancel', up); });
 tbUpdate();
-const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; tId = -1; tN = 0; };
-const capture = () => { sound(); const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
+const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; $('dS').className = ''; tId = -1; tN = 0; };
+const capture = () => { sound(); if (TOUCHUI) return; const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
 canvas.addEventListener('click', capture);
 addEventListener('mousemove', (e) => { if (document.pointerLockElement === canvas) { mdx += e.movementX; mdy += e.movementY; } });
 addEventListener('blur', release);

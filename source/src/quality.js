@@ -15,3 +15,5 @@ const THIN = 1 << LV, SHADOW = LV ? 2048 : 4096, AA = LV > 1 ? 1 : 4, WATER = LV
 
 // ?dbg=N shows an intermediate stage instead of the final image (1 composite runs, 2 scene, 3 shafts, 4 sky pass runs, 5 depth, 6 sky ray directions, 7 plain sky gradient)
 const DBG = +new URLSearchParams(location.search).get('dbg') || 0;
+// ?touch shows the touch controls on a computer too (the mouse drags to look)
+const TOUCHUI = mob || new URLSearchParams(location.search).has('touch');

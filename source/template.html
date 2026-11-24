@@ -112,11 +112,18 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
   box-shadow: inset 0 0 0 2px #7ff3ff, 0 .3em 1em #0009; font-size: 1.3em; color: #e8fbff; opacity: .8;
 }
 .g #o { display: flex; }
-/* touch buttons: switch place and role, trigger the animal's call and special action */
-#t { position: absolute; left: .6em; right: .6em; bottom: .6em; display: none; justify-content: space-between; gap: .4em; pointer-events: none; }
-#t button { pointer-events: auto; flex: 0 1 auto; padding: .7em .9em; font-size: .8em; opacity: .85; user-select: none; -webkit-user-select: none; touch-action: none; }
+/* touch controls (phones and tablets, or ?touch): place/role/view top right, call and action bottom right, a direction pad bottom left */
+#t { position: absolute; inset: 0; display: none; pointer-events: none; }
+.tc .g #t { display: block; }
+#t button { pointer-events: auto; padding: .7em .9em; font-size: .8em; opacity: .85; user-select: none; -webkit-user-select: none; touch-action: none; }
 #t button[hidden] { display: none; }
-@media (pointer: coarse) { .g #t { display: flex; } }
+#tr, #ta { position: absolute; right: .6em; display: flex; flex-direction: column; align-items: flex-end; gap: .4em; }
+#tr { top: 3.8em; }
+#ta { bottom: .8em; }
+#ta button { min-width: 6em; padding: 1em 1.1em; font-size: .9em; }
+#tl { position: absolute; left: .8em; bottom: .8em; display: grid; grid-template: repeat(3, 3.2em) / repeat(3, 3.2em); gap: .25em; }
+#tl button { padding: 0; font-size: 1em; letter-spacing: 0; }
+#tl button.on { background: #7ff3ff; }
 .p #o { display: none; }
 #i {
   position: absolute; top: 1em; left: 1.2em; margin: 0; font: .8em/1.6 ui-monospace, Consolas, monospace;
@@ -149,7 +156,7 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
           <i><b>H</b></i>Stats
         </p>
       </div>
-      <p id=h>Hold to swim forward · slide to steer · second finger to go faster · buttons: place, role, view, call and action</p>
+      <p id=h>Direction pad to move · drag to look · » to run · buttons: place, role, view, call and action</p>
     </div>
   </div>
   <p id=f>
@@ -158,7 +165,11 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
   </p>
 </div>
 <button id=o aria-label=Menu>≡</button>
-<div id=t><button id=t1>Place</button><button id=t2>Role</button><button id=t3>View</button><button id=t4>Call</button><button id=t5>Action</button></div>
+<div id=t>
+  <div id=tr><button id=t1>Place</button><button id=t2>Role</button><button id=t3>View</button></div>
+  <div id=ta><button id=t5>Action</button><button id=t4>Call</button></div>
+  <div id=tl><button id=dU style="grid-area:1/2" aria-label=Forward>▲</button><button id=dL style="grid-area:2/1" aria-label=Left>◀</button><button id=dS style="grid-area:2/2" aria-label=Run>»</button><button id=dR style="grid-area:2/3" aria-label=Right>▶</button><button id=dD style="grid-area:3/2" aria-label=Back>▼</button></div>
+</div>
 <pre id=i></pre>
 <script>
 /*SCRIPT*/
