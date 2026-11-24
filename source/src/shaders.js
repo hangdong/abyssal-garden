@@ -1056,7 +1056,7 @@ const W_RAYS = S_G + W_FS + /*wgsl*/`
   let nd = vec2f(uv.x * 2. - 1., 1. - uv.y * 2.);
   let rv = g.fwd.xyz + g.right.xyz * (nd.x * g.right.w) + g.up.xyz * (nd.y * g.up.w);
   let rl = length(rv); let rd = rv / rl;
-  let zl = g.fwd.w / max(dp, 1e-6);
+  let zl = min(g.fwd.w / max(dp, 1e-6), 2e4);   // the sky (depth 0) must stay within half-float range: Inf here made NaN in the blur and the composite
   if (g.cam.y > 0.) { return vec4f(0., 0., 0., zl); }
   var tm = min(zl * rl, 120.);
   if (rd.y > 1e-4) { tm = min(tm, -g.cam.y / rd.y); }
@@ -1110,7 +1110,7 @@ fn sat3(x: vec3f) -> vec3f { return clamp(x, vec3f(0.), vec3f(1.)); }
 @fragment fn fs(@builtin(position) fc: vec4f) -> @location(0) vec4f {
   let px = vec2i(fc.xy);
   let uv = fc.xy * g.res.zw;
-  let zf = g.fwd.w / max(textureLoad(tDp, px, 0), 1e-6);
+  let zf = min(g.fwd.w / max(textureLoad(tDp, px, 0), 1e-6), 2e4);
   // depth-aware upsample of the half-res shafts
   let h = fc.xy * .5 - .5; let b = floor(h); let f = h - b; let bi = vec2i(b);
   let mx = vec2i(textureDimensions(tR)) - 1;
@@ -1122,7 +1122,7 @@ fn sat3(x: vec3f) -> vec3f { return clamp(x, vec3f(0.), vec3f(1.)); }
     let w = (bw + .02) / (.02 + abs(r.a - zf) / zf);
     acc += r.rgb * w; ws += w;
   }
-  var c = textureLoad(tS, px, 0).rgb + acc / ws;
+  var c = textureLoad(tS, px, 0).rgb + acc / max(ws, 1e-6);
   let bl = textureSampleLevel(tB, sC, uv, 0.).rgb;
   c = mix(c, bl, .06) + bl * .03;
   c *= g.mis.x;
