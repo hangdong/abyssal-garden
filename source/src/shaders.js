@@ -311,7 +311,7 @@ fn cloudN(p: vec2f) -> f32 { return cn(p * 1.7) * .5 + cn(p * 3.6 + 7.) * .3 + c
 // the sky seen from above the water
 fn skyAt(rd: vec3f) -> vec3f {
   let h = sat(rd.y);
-  var c = mix(vec3f(1.45, 2.05, 2.85), vec3f(.24, .7, 2.3), pow(max(h, 1e-4), .4));
+  var c = mix(vec3f(1.7, 2.3, 2.9), vec3f(.28, .75, 2.3), pow(max(h, 1e-4), .4));
   let mu = max(dot(rd, g.sun.xyz), 1e-4);
   if (rd.y > .02) {   // drifting clouds: two octaves of the rock mottling texture, projected on a flat layer; thick cores are greyer
     let uv = rd.xz / (rd.y + .12) * .55 + vec2f(g.cam.w * .004, g.cam.w * .0015);
@@ -333,7 +333,7 @@ fn fog(c: vec3f, wp: vec3f, z: f32) -> vec3f {
       let p0 = g.cam.xyz + rd * da; let dw = d - da;
       cc = c * exp(-sg(z) * dw) + fogIn(p0, rd, dw, z, g.sun.xyz) * (.58 + .42 * vol(p0 + rd * min(dw, 150.)).g);
     }
-    return mix(cc * ss(230., 185., d), skyAt(vec3f(rd.x, 0., rd.z)) * .8, 1. - exp(-da * .0011));
+    return mix(cc * ss(230., 185., d), skyAt(vec3f(rd.x, 0., rd.z)) * .8, 1. - exp(-da * .0004));
   }
   return c * exp(-sg(z) * d) * ss(230., 185., d) + fogIn(g.cam.xyz, rd, d, z, g.sun.xyz) * (.58 + .42 * vol(g.cam.xyz + rd * min(d, 150.)).g);
 }
@@ -1141,7 +1141,6 @@ fn sat3(x: vec3f) -> vec3f { return clamp(x, vec3f(0.), vec3f(1.)); }
   c *= l / max(l0, 1e-4);
   c = mix(c, vec3f(l), ss(.55, 1., l) * .1);
   c = mix(vec3f(l), c, .93) + vec3f(.008, .002, 0.);
-  if (g.cam.y > 0.) { c = mix(vec3f(dot(c, vec3f(.2126, .7152, .0722))), c, 1.3); c = pow(max(c, vec3f(0.)), vec3f(1.12)); }   // above the water: richer colour, less haze-white
   c = pow(max(c, vec3f(0.)), vec3f(1. / 2.2));
   let n = ign(fc.xy) + ign(fc.xy + 37.) - 1.;
   return vec4f(c + n / 255., 1.);

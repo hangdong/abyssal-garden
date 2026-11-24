@@ -27,6 +27,11 @@ const errBox = document.createElement('pre'); errBox.style.cssText = 'position:f
 document.body.append(errBox);
 const showErr = (t) => { errBox.style.display = 'block'; errBox.textContent += t + '\n'; };
 device.addEventListener('uncapturederror', (e) => { console.error('GPU: ' + e.error.message); showErr('GPU: ' + e.error.message.slice(0, 400)); });
+if (new URLSearchParams(location.search).has('tune')) {
+  const upd = () => { errBox.style.display = 'block'; errBox.textContent = 'above-water brightness AIREXP = ' + (AIREXP || 0.336).toFixed(3) + '   ( [ darker   ] brighter   Shift = bigger steps )'; };
+  addEventListener('keydown', (e) => { if (e.code === 'BracketLeft' || e.code === 'BracketRight') { AIREXP = max(0.05, AIREXP + (e.code === 'BracketRight' ? 1 : -1) * (e.shiftKey ? 0.05 : 0.01)); upd(); } });
+  upd();
+}
 if (DBG) { const ai = adapter.info || {}; showErr('dbg=' + DBG + ' ' + [ai.vendor, ai.architecture, ai.description].join(' ') + ' fmt=' + navigator.gpu.getPreferredCanvasFormat() + ' AA=' + AA + ' LV=' + LV); }
 // out of memory or a GPU timeout: reload a level lower, or on Low say what happened
 device.lost.then((l) => {
@@ -1169,7 +1174,8 @@ if (hasTS) {
 // ---------------------------------------------------------------- frame
 let hud = false;
 let kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
-const TANH = 0.6, NEAR = 0.1, EXPO = 0.62, RAYS = 0.54, AIREXP = 0.62;
+const TANH = 0.6, NEAR = 0.1, EXPO = 0.62, RAYS = 0.54;
+var AIREXP = 0.336;   // brightness above the water; ?tune lets [ and ] change it
 const submitList = [null];
 const rowOrd = new Uint8Array(CELLS);
 // Draws the cells of a cell-sorted buffer that are in view and within [minD, maxD) (scaled by `det`, but not for the
