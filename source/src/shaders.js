@@ -311,8 +311,8 @@ fn cloudN(p: vec2f) -> f32 { return cn(p * 1.7) * .5 + cn(p * 3.6 + 7.) * .3 + c
 // the sky seen from above the water
 fn skyAt(rd: vec3f) -> vec3f {
   let h = sat(rd.y);
-  var c = mix(vec3f(1.7, 2.3, 2.9), vec3f(.28, .75, 2.3), pow(h, .4));
-  let mu = max(dot(rd, g.sun.xyz), 0.);
+  var c = mix(vec3f(1.7, 2.3, 2.9), vec3f(.28, .75, 2.3), pow(max(h, 1e-4), .4));
+  let mu = max(dot(rd, g.sun.xyz), 1e-4);
   if (rd.y > .02) {   // drifting clouds: two octaves of the rock mottling texture, projected on a flat layer; thick cores are greyer
     let uv = rd.xz / (rd.y + .12) * .55 + vec2f(g.cam.w * .004, g.cam.w * .0015);
     let n = cloudN(uv) * .62 + cloudN(uv * 2.7 + 3.1) * .38;
@@ -967,7 +967,7 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f };
   var o: VO;
   let p = vec2f(f32(i & 1u), f32(i >> 1u)) * 2. - 1.;
   o.wp = g.cam.xyz + g.fwd.xyz + g.right.xyz * (p.x * g.right.w) + g.up.xyz * (p.y * g.up.w);
-  o.cp = vec4f(p, 1e-7, 1.);
+  o.cp = vec4f(p, 1e-6, 1.);
   return o;
 }
 @fragment fn fsB(i: VO) -> @location(0) vec4f {
