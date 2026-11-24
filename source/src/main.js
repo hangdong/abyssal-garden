@@ -302,7 +302,8 @@ meshes.push(meshPalm().build(), meshTree(1).build(), meshTree(2).build(), meshBu
   meshPerson(0).build(), meshPerson(1).build(), meshPerson(2).build(), meshPerson(3).build(), meshUmbrella().build(), meshSeaLion(false).build(), meshCaveFrame().build(), meshNest().build());
 const GAR = meshGaribaldi().build(), SNORK = meshPerson(4).build(), LIONSWIM = meshSeaLion(true).build(), SEAL = meshSeal().build(), GULL = meshGull().build(), CHIP = meshChipmunk().build();
 const BOARD = meshSurfboard().build(), SUPB = meshSUPBoard().build(), KAYAK = meshKayak().build(), PAD1 = meshPaddle(false).build(), PAD2 = meshPaddle(true).build(), FOAM = meshFoam().build(), PELICAN = meshPelican().build(), CRAB = meshCrab().build(), BLOB = meshBlob(1, 1).build(), BLOBL = meshBlob(1.9, 0.85).build(), CFISH = meshCaughtFish().build();
-meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, BLOB, BLOBL, CFISH);
+const DROP = meshDrop().build(), SPLAT = meshSplat().build();
+meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, BLOB, BLOBL, CFISH, DROP, SPLAT);
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
 const allV = new Uint8Array(nV * 16), allI = new Uint32Array(nI);
@@ -319,7 +320,7 @@ const drawDeco = (r) => { for (let k = 0; k < nDeco.length; k++) if (nDeco[k]) {
 // Every figure is an actor: a little state machine on the CPU (where it is, what it does, how it reacts to the camera) that
 // writes one instance per frame. The vertex shader poses it (walk cycle, digging, waving, head turn, breathing, swim stroke).
 // slots: 0-3 people (stand, sit, lie, crouch), 4 snorkeler, 5 sea lion on land, 6 sea lion swimming
-const SLM = [meshes[DECO0 + 11], meshes[DECO0 + 12], meshes[DECO0 + 13], meshes[DECO0 + 14], SNORK, meshes[DECO0 + 16], LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, CFISH];   // 18 the pelican's fish, 17 crab, 16 pelican, 10 surfboard, 11 paddle board, 12 kayak, 13 paddle, 14 kayak paddle, 15 spray
+const SLM = [meshes[DECO0 + 11], meshes[DECO0 + 12], meshes[DECO0 + 13], meshes[DECO0 + 14], SNORK, meshes[DECO0 + 16], LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, CFISH, DROP, SPLAT];   // 19 a dropping, 20 its splat, 18 the pelican's fish, 17 crab, 16 pelican, 10 surfboard, 11 paddle board, 12 kayak, 13 paddle, 14 kayak paddle, 15 spray
 const NACT = Wd.actors.length, SLI = SLM.map(() => new Float32Array(NACT * 12)), SLN = new Uint32Array(SLM.length);
 const SLB = SLM.map(() => device.createBuffer({ size: NACT * 48, usage: BU.VERTEX | BU.COPY_DST }));
 const drawActors = (r) => { for (let s = 0; s < SLM.length; s++) if (SLN[s]) { r.setVertexBuffer(1, SLB[s]); r.drawIndexed(SLM[s].ib.length, SLN[s], SLM[s].i0, SLM[s].v0, 0); } };
@@ -683,7 +684,7 @@ function emitCraft(a) {
 }
 // ---------------------------------------------------------------- roles: swim as yourself, or be a sea lion, a gull or the lifeguard
 // T changes role, V swaps between the chase camera and the animal's own eyes, B calls: a bark, a squawk, or the lifeguard's warning.
-const ROLES = ['Swimmer', 'Sea lion', 'Gull', 'Lifeguard', 'Pelican', 'Crab', 'Seal'], CALLS = ['', 'bark  ·  E charge and bite', 'squawk', 'warn the visitors', 'plunge-dive for fish', 'pinch  ·  E dig in / out', 'grunt'];
+const ROLES = ['Swimmer', 'Sea lion', 'Gull', 'Lifeguard', 'Pelican', 'Crab', 'Seal'], CALLS = ['', 'bark  ·  E charge and bite', 'squawk  ·  P drop a dropping', 'warn the visitors', 'plunge-dive for fish', 'pinch  ·  E dig in / out', 'grunt'];
 let ROLE = 0, TPV = true, swapped = false, score = 0, callCd = 0, callT = 0, fishCaught = 0, pinched = 0;
 const PL = new Float64Array(3), EY = new Float64Array(3), DV = new Float64Array(7);
 // avatar: mode 0 on the ground (sea lion on land, gull walking), 1 in the water (swimming, floating), 2 in the air (gull)
@@ -691,7 +692,7 @@ const AV = { x: 0, y: 0, z: 0, hd: PI, pitch: 0, roll: 0, sp: 0, ph: 0, mode: 0,
 const HUDR = document.createElement('div');
 HUDR.style.cssText = 'position:fixed;top:1em;left:50%;transform:translateX(-50%);padding:.35em .9em;background:#0008;color:#e8fbff;font:600 .85em system-ui,sans-serif;border-radius:2em;pointer-events:none;z-index:5;white-space:nowrap';
 document.body.append(HUDR);
-function roleHud() { if (typeof tbUpdate === 'function') tbUpdate(); HUDR.textContent = ROLES[ROLE] + (TOUCHUI ? '' : ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
+function roleHud() { if (typeof tbUpdate === 'function') tbUpdate(); HUDR.textContent = ROLES[ROLE] + (TOUCHUI ? '' : ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 2 ? '  ·  hits: ' + poopHits : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
 function setRole(r) {
   if (ROLE === 0) { DV[0] = F[CX]; DV[1] = F[CY]; DV[2] = F[CZ]; DV[3] = F[YAW]; DV[4] = F[PIT]; DV[5] = walk ? 1 : 0; DV[6] = above ? 1 : 0; }
   ROLE = r; perchOn = r === 2 || r === 4; walk = above = false; F[VX] = F[VY] = F[VZ] = 0; TPV = true; swapped = false; AV.vx = AV.vy = AV.vz = AV.sp = AV.mv = AV.pitch = AV.roll = 0;
@@ -849,6 +850,36 @@ function placeCamera() {
 }
 const GUARDSEED = (() => { for (const a of Wd.actors) if (a.k === 'F') return a.seed; return 0.3; })();
 // the gull's nest on the tower roof: two chicks and a parent standing by
+// gull droppings (the gull role, P): they fall, splash into the sea, splat on the ground and hit people
+var DROPS = [], SPLATS = [], poopCd = 0, poopHits = 0;
+function doPoop() {
+  if (ROLE !== 2 || poopCd > 0 || AV.mode >= 3 || DROPS.length > 10) return;
+  poopCd = 0.5; const hs = AV.mode === 2 ? AV.sp * cos(AV.pitch) : 0;
+  DROPS.push({ x: AV.x - cos(AV.hd) * 0.2, y: AV.y + 0.05, z: AV.z - sin(AV.hd) * 0.2, vx: cos(AV.hd) * hs, vz: sin(AV.hd) * hs, vy: AV.mode === 2 ? AV.sp * sin(AV.pitch) * 0.5 : 0 });
+  if (CLICK) CLICK(0, 0.15);
+}
+function emitPoop(dt) {
+  poopCd -= dt;
+  for (let i = DROPS.length - 1; i >= 0; i--) {
+    const d = DROPS[i]; d.vy -= 9.8 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
+    let done = false;
+    for (const a of ACT) if ((a.k === 'P' || a.k === 'V') && a.ft <= 0 && hypot(a.x - d.x, a.z - d.z) < 0.45 * a.sc && d.y > a.y && d.y < a.y + (a.pose === 0 ? 1.8 : 0.9) * a.sc) {
+      crabPinchPerson(a, d.x - d.vx, d.z - d.vz); a.ft = 2.2; poopHits++; roleHud(); toast(['Ew! A seagull pooped on me!', 'Hey! Right on my shirt!', 'Yuck! That bird!'][poopHits % 3], 1);
+      SPLATS.push({ x: d.x, y: d.y, z: d.z, t: 0, s: 0.5 }); done = true; break;
+    }
+    if (!done) {
+      const g = ground(d.x, d.y + 0.6, d.z);
+      if (g > -0.3 && d.y <= g) { SPLATS.push({ x: d.x, y: g, z: d.z, t: 0, s: 0.6 + rnd() * 0.5 }); done = true; }
+      else if ((g <= -0.3 || g < -1e8) && d.y <= 0) { splash(d.x, d.z); done = true; }
+      else if (d.y < -5) done = true;
+    }
+    if (done) { DROPS.splice(i, 1); if (SPLATS.length > 24) SPLATS.shift(); } else emit(19, d.x, d.y, d.z, 0, 0, 0, 0.5, 0, 0, 1, 13);
+  }
+  for (let i = SPLATS.length - 1; i >= 0; i--) {
+    const s = SPLATS[i]; s.t += dt; if (s.t > 30) { SPLATS.splice(i, 1); continue; }
+    emit(20, s.x, s.y + 0.012, s.z, s.x * 7, 0, 0, 0.5, 0, 0, s.s * min(1, s.t * 8) * min(1, (30 - s.t) / 6), 13);
+  }
+}
 function emitNest() {
   const N = Wd.nest; if (!N) return; const t = F[TIME];
   emit(8, N[0] + 0.12, N[1] + 0.1, N[2] + 0.06, 0.6, 0, 0, 3.3, 0, 0, 0.36, 13);
@@ -1084,7 +1115,7 @@ function updateActors(dt) {
     f[o + 8] = k === 'P' || k === 'N' || k === 'V' ? 10 : k === 'G' ? 13 : k === 'C' ? 14 : 11; f[o + 9] = a.seed; f[o + 10] = a.ph;
     f[o + 11] = k === 'P' ? a.pose + a.amt * 0.99 : k === 'V' ? a.amt * 0.99 : k === 'N' ? 4 + a.amt * 0.99 : k === 'L' ? (a.st >= 3 ? 2 + a.lg * 0.99 : a.amt * 0.49 + (a.mv ? 0.5 : 0)) : k === 'G' ? (a.st >= 2 ? 1 + a.amt * 0.99 : a.pk * 0.49 + (a.mv ? 0.5 : 0)) : k === 'C' ? a.pose + a.amt * 0.99 : 1;
   }
-  emitNest(); emitAvatar(); updBaby(dt); emitSplashes(dt); addBlobs();
+  emitNest(); emitPoop(dt); emitAvatar(); updBaby(dt); emitSplashes(dt); addBlobs();
   for (let s = 0; s < SLM.length; s++) if (SLN[s]) Q.writeBuffer(SLB[s], 0, SLI[s], 0, SLN[s] * 12);
 }
 const ibChunk = Wd.chunks.map((c) => buf(c.data, BU.VERTEX)), ibProp = Wd.props.map((c) => buf(c.data, BU.VERTEX));
@@ -1463,6 +1494,7 @@ const key = (e, v) => {
       else if (e.code === 'KeyT') setRole((ROLE + 1) % 7);
       else if (e.code === 'KeyV') { if (ROLE) TPV = !TPV; }
       else if (e.code === 'KeyB') doCall();
+      else if (e.code === 'KeyP') doPoop();
       else if (e.code === 'Escape') ui(true);
       else if (e.code >= 'Digit1' && e.code <= 'Digit8') { if (ROLE) setRole(0); vpI = e.code.charCodeAt(5) - 49; lookAt(...POSES[vpI]); }
     }
@@ -1481,14 +1513,15 @@ $('dS').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropa
 if (TOUCHUI && !mob) { let dn = false; canvas.addEventListener('mousedown', () => { dn = true; }); addEventListener('mouseup', () => { dn = false; }); addEventListener('mousemove', (e) => { if (dn) { mdx += e.movementX; mdy += e.movementY; } }); }
 // touch buttons: next viewpoint, next role, view, the animal's call (B) and its special action (E: charge, dig, take off)
 var vpI = 7;
-const TB = [1, 2, 3, 4, 5].map((i) => $('t' + i)), SPECIAL = { 1: 'Charge', 2: 'Take off', 4: 'Take off', 5: 'Dig' };
+const TB = [1, 2, 3, 4, 5, 6].map((i) => $('t' + i)), SPECIAL = { 1: 'Charge', 2: 'Take off', 4: 'Take off', 5: 'Dig' };
 const TLAB = ['', 'Bark', 'Squawk', 'Warn', 'Dive', 'Pinch', 'Grunt'];
-var tbUpdate = () => { TB[1].textContent = ROLE ? 'Role: ' + ROLES[ROLE] : 'Role'; TB[2].hidden = !ROLE; TB[3].hidden = !ROLE; TB[3].textContent = TLAB[ROLE]; TB[4].hidden = !SPECIAL[ROLE]; TB[4].textContent = SPECIAL[ROLE] || ''; };
+var tbUpdate = () => { TB[1].textContent = ROLE ? 'Role: ' + ROLES[ROLE] : 'Role'; TB[2].hidden = !ROLE; TB[3].hidden = !ROLE; TB[3].textContent = TLAB[ROLE]; TB[4].hidden = !SPECIAL[ROLE]; TB[4].textContent = SPECIAL[ROLE] || ''; TB[5].hidden = ROLE !== 2; };
 const tbOn = (b, f) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound(); f(e); });
 tbOn(TB[0], () => { if (ROLE) setRole(0); vpI = (vpI + 1) % 8; lookAt(...POSES[vpI]); });
 tbOn(TB[1], () => setRole((ROLE + 1) % 7));
 tbOn(TB[2], () => { if (ROLE) TPV = !TPV; });
 tbOn(TB[3], () => doCall());
+tbOn(TB[5], () => doPoop());
 tbOn(TB[4], () => { key({ code: 'KeyE', repeat: false }, 1); const up = () => { key({ code: 'KeyE' }, 0); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); }; addEventListener('pointerup', up); addEventListener('pointercancel', up); });
 tbUpdate();
 const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; $('dS').className = ''; tId = -1; tN = 0; };

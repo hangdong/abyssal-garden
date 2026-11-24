@@ -1133,6 +1133,9 @@ function meshBlob(sx, sz) {
 }
 
 // the fish a pelican has caught: silver, about 30 cm, with a dark eye and a forked tail (aux 1 is white, .78 dark)
+// a falling dropping and the splat it leaves (white, drawn with the gull material)
+function meshDrop() { const m = new Mesh(); ball(m, [0, 0, 0], 0.04, 0.1, 1.5, 1); return m; }
+function meshSplat() { const m = new Mesh(); ball(m, [0, 0, 0], 0.22, 0.1, 0.05, 2); return m; }
 function meshCaughtFish() {
   const m = new Mesh();
   etube(m, [[-0.17, 0, 0], [-0.1, 0, 0], [0, 0, 0], [0.1, 0, 0], [0.17, 0, 0]], [0.008, 0.038, 0.05, 0.036, 0.012], [0.006, 0.022, 0.03, 0.02, 0.008], 1, 12, 3);
