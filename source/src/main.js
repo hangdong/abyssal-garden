@@ -681,7 +681,7 @@ const AV = { x: 0, y: 0, z: 0, hd: PI, pitch: 0, roll: 0, sp: 0, ph: 0, mode: 0,
 const HUDR = document.createElement('div');
 HUDR.style.cssText = 'position:fixed;top:1em;left:50%;transform:translateX(-50%);padding:.35em .9em;background:#0008;color:#e8fbff;font:600 .85em system-ui,sans-serif;border-radius:2em;pointer-events:none;z-index:5;white-space:nowrap';
 document.body.append(HUDR);
-function roleHud() { if (typeof tbUpdate === 'function') tbUpdate(); HUDR.textContent = ROLES[ROLE] + (ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
+function roleHud() { if (typeof tbUpdate === 'function') tbUpdate(); HUDR.textContent = ROLES[ROLE] + (TOUCHUI ? '' : ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
 function setRole(r) {
   if (ROLE === 0) { DV[0] = F[CX]; DV[1] = F[CY]; DV[2] = F[CZ]; DV[3] = F[YAW]; DV[4] = F[PIT]; DV[5] = walk ? 1 : 0; DV[6] = above ? 1 : 0; }
   ROLE = r; if (!PERCH.length) buildPerches(); perchOn = r === 2 || r === 4; walk = above = false; F[VX] = F[VY] = F[VZ] = 0; TPV = true; swapped = false; AV.vx = AV.vy = AV.vz = AV.sp = AV.mv = AV.pitch = AV.roll = 0;

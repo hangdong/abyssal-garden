@@ -396,10 +396,10 @@ function makeWorld(D, T, flyPts, POSES) {
   // pups: tucked in among the adults
   for (const a of [[141.2, 23.9, 0.5, 3.0], [140, 26.8, 0.45, 3.5], [139.4, 29.6, 0.5, 3.2], [134.2, 30.2, 0.48, 3.9], [148.6, 25.2, 0.5, 3.4], [145.2, 17.4, 0.45, 3.7],
     [141.2, 14.2, 0.5, 3.1], [135.7, 23.2, 0.46, 3.3], [146.6, 30.4, 0.52, 3.8]]) actors.push({ k: 'L', x: a[0], z: a[1], yaw: a[3], sc: a[2], seed: rnd() });
-  for (const q of [[121, 2], [112, 20], [124, -30], [108, -14], [117, 36]]) actors.push({ k: 'S', x: q[0], z: q[1], yaw: rnd() * TAU, sc: rr(0.95, 1.1), seed: rnd() });
+  for (const q of [[121, 2], [112, 20], [124, -30]]) actors.push({ k: 'S', x: q[0], z: q[1], yaw: rnd() * TAU, sc: rr(0.95, 1.1), seed: rnd() });
   for (const q of [[113, -19], [125, 11], [106, 26], [119, -41], [127, -4]]) actors.push({ k: 'N', x: q[0], z: q[1], yaw: rnd() * TAU, sc: 1, seed: rnd() });
   // harbour seals: shy, spotted, swimming offshore (seed >= 10 marks a seal for the shader)
-  for (const q of [[99, -26], [103, 14], [96, -6], [107, 34], [101, -40]]) actors.push({ k: 'E', x: q[0], z: q[1], yaw: rnd() * TAU, sc: rr(0.9, 1.1), seed: 10 + rnd() });
+  for (const q of [[99, -26], [103, 14], [101, -40]]) actors.push({ k: 'E', x: q[0], z: q[1], yaw: rnd() * TAU, sc: rr(0.9, 1.1), seed: 10 + rnd() });
   // gulls: on the sand (st 0), floating on the sea (st 1) and in the air (st 2)
   for (const q of [[148, -2, 0], [152, 6, 0], [146, 12, 0], [155, -16, 0], [112, -4, 1], [118, 14, 1], [108, -22, 1], [120, 14, 2], [116, -10, 2], [127, 26, 2]]) actors.push({ k: 'G', x: q[0], z: q[1], yaw: rnd() * TAU, sc: rr(0.95, 1.1), seed: rnd(), st: q[2] });
   // the lifeguard on the tower deck (red top: the seed is picked for it), who shouts at anyone too close to the sea lions
