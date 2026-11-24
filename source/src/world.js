@@ -318,8 +318,8 @@ function makeWorld(D, T, flyPts, POSES) {
   // --- the clifftop and stairs: palms, wind-sculpted trees, bushes, steps, rails, lamps, benches, the lifeguard tower
   // mesh slots: 0 palm, 1-2 tree, 3 bush, 4 step, 5 rail, 6 lamp, 7 bench, 8-10 tower (concrete, glass and steel, wood)
   // 11-14 people meshes (standing, sitting, lying on a towel, crouching: drawn as animated actors), 15 umbrella, 16 sea lion, 17 cave frame
-  const MATOF = [6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 9, 10, 10, 10, 10, 12, 11, 7];
-  const deco = Array.from({ length: 18 }, () => []);
+  const MATOF = [6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 9, 10, 10, 10, 10, 12, 11, 7, 6];
+  const deco = Array.from({ length: 19 }, () => []);
   const put = (k, x, y, z, sc, q, seed = rnd()) => deco[k].push(x, y, z, sc, q[0], q[1], q[2], q[3], MATOF[k], seed, 1, 0);
   const topAt = (x, z) => { const f = floorsAt(x, z); return f.length && f[0] > 9 ? f[0] : null; };
   const yawQ = (a) => qAxis(0, 1, 0, a);
@@ -369,7 +369,19 @@ function makeWorld(D, T, flyPts, POSES) {
   // benches facing the sea
   for (const p of [[177, -24], [177, 22], [139, cz(-1, 139) + 2.2], [139, cz(1, 139) - 2.2], [152, cz(-1, 152) + 2.2], [152, cz(1, 152) - 2.2]]) { const y = topAt(p[0], p[1]); if (y !== null) put(7, p[0], y, p[1], 1, yawQ(0), 0); }
   // the lifeguard tower, cantilevered over the cliff edge, facing west
-  { const x = 177.4, z = -10, y = topAt(x, z); if (y !== null) for (const k of [8, 9, 10]) put(k, x, y, z, 1.5, yawQ(0), 0); }
+  let tower = null, nest = null;
+  { const x = 177.4, z = -10, y = topAt(x, z); if (y !== null) { for (const k of [8, 9, 10]) put(k, x, y, z, 1.5, yawQ(0), 0); tower = [x, y, z, 1.5];
+    nest = [x - 2.2, y + 3.8 * 1.5, z + 0.4]; put(18, nest[0], nest[1], nest[2], 1.7, yawQ(0.7), 0); } }   // a gull's nest on the roof
+  // a short stair up to the deck from the clifftop on its south side (7 steps, each also a solid box in `stairs`)
+  const stairs = [];
+  if (tower) {
+    const sx = tower[0] - 4.4, dz0 = tower[2] + 3.45, y0 = topAt(sx, dz0 + 2) ?? tower[1], rise = tower[1] + 1.05 * 1.5 - y0, n = 7, sc = 0.6, dep = 0.66 * sc, yaw = yawQ(atan2(-(-1), 0));
+    for (let j = 1; j <= n; j++) {
+      const zc = dz0 + 0.2 + (n - j + 0.5) * dep, top = y0 + rise * j / n;
+      put(4, sx, top, zc, sc, yaw, 0);
+      stairs.push([sx - 1.72 * sc, sx + 1.72 * sc, zc - dep / 2, zc + dep / 2, top]);
+    }
+  }
 
   // the cave mouth: a concrete lintel and a pillar between the two tunnels
   put(17, 129, 0, 32.6, 1, yawQ(0), 0);
@@ -404,7 +416,7 @@ function makeWorld(D, T, flyPts, POSES) {
   for (const q of [[148, -2, 0], [152, 6, 0], [146, 12, 0], [155, -16, 0], [112, -4, 1], [118, 14, 1], [108, -22, 1], [120, 14, 2], [116, -10, 2], [127, 26, 2]]) actors.push({ k: 'G', x: q[0], z: q[1], yaw: rnd() * TAU, sc: rr(0.95, 1.1), seed: rnd(), st: q[2] });
   // the lifeguard on the tower deck (red top: the seed is picked for it), who shouts at anyone too close to the sea lions
   let gs = 0.05; while (!(((gs * 7.3 + 0.31) % 1) < 0.14)) gs += 0.011;
-  actors.push({ k: 'F', pose: 0, x: 172.8, z: -8.7, yaw: -0.8, sc: 1, seed: gs, high: 1, lift: 1.58 });
+  actors.push({ k: 'F', pose: 0, x: 172.8, z: -8.7, yaw: -0.8, sc: 1, seed: gs, high: 1, lift: 0 });
   // out beyond the cove and the swimmers: kayaks, paddle boards and surfers (seed picks the colours of boards and boats)
   for (const q of [[72, -22], [66, 14], [84, 38]]) actors.push({ k: 'K', x: q[0], z: q[1], yaw: rnd() * TAU, sc: 1, seed: rnd() });
   for (const q of [[60, -8], [78, -36]]) actors.push({ k: 'U', x: q[0], z: q[1], yaw: rnd() * TAU, sc: 1, seed: rnd() });
@@ -525,7 +537,7 @@ function makeWorld(D, T, flyPts, POSES) {
     for (let c = 0; c < nCells; c++) { const a = L[c]; for (let i = 0; i < a.length; i += 12) { for (let j = 0; j < 12; j++) data[k++] = a[i + j]; lo[c] = min(lo[c], a[i + 1] - 3); hi[c] = max(hi[c], a[i + 1] + 3); } }
     return { data, n, start, lo, hi };
   };
-  return { blockers, actors, gar: new Float32Array(gar), deco: deco.map((a) => new Float32Array(a)), gy, glints: new Float32Array(glints), chunks: chunks.map(packC), props: props.map(packC), big: pack(big), bigF: pack(big, 2, 1.5), small: pack(small), solids: { data: new Float32Array(sol.data), ranges: sol.ranges }, bubbles: new Float32Array(bubbles), volD, gm, fish: new Float32Array(fish), mantas: new Float32Array(mantas), snow };
+  return { tower, nest, stairs, blockers, actors, gar: new Float32Array(gar), deco: deco.map((a) => new Float32Array(a)), gy, glints: new Float32Array(glints), chunks: chunks.map(packC), props: props.map(packC), big: pack(big), bigF: pack(big, 2, 1.5), small: pack(small), solids: { data: new Float32Array(sol.data), ranges: sol.ranges }, bubbles: new Float32Array(bubbles), volD, gm, fish: new Float32Array(fish), mantas: new Float32Array(mantas), snow };
 }
 const fract = (x) => x - floor(x);
 
@@ -795,6 +807,21 @@ function meshBench() {
   return m;
 }
 // the tower faces -x. Concrete: pedestal. Glass and steel: front window, side panes, deck rail. Wood: cabin, roof, slats, deck.
+// a gull's nest: a bowl of twigs and dry grass, 0.5 m across, its rim at y = 0.1
+function meshNest() {
+  rseed(260);
+  const m = new Mesh();
+  for (let i = 0; i < 46; i++) {
+    const a = rnd() * TAU, r = rr(0.17, 0.27), h = rr(0.0, 0.1), len = rr(0.25, 0.4), t = a + rr(0.9, 1.5) * (rnd() < 0.5 ? 1 : -1), pts = [];
+    for (let k = 0; k <= 2; k++) { const u = k / 2 - 0.5; pts.push([cos(a) * r + cos(t) * u * len, h + 0.03 * (1 - abs(u * 2)) + rr(0, 0.02), sin(a) * r + sin(t) * u * len]); }
+    m.tube(pts, () => 0.012 + rnd() * 0.008, 4, true, () => 0.55);
+  }
+  for (let i = 0; i < 26; i++) {   // the lining
+    const a = rnd() * TAU, r = rr(0.0, 0.14), pts = [[cos(a) * r, 0.04, sin(a) * r], [cos(a) * (r + 0.07), 0.05, sin(a) * (r + 0.07)]];
+    m.tube(pts, () => 0.01, 4, true, () => 0.7);
+  }
+  return m;
+}
 function meshTowerC() {
   const m = new Mesh();
   box(m, -4.4, 2.2, 2.7, 3.2, 0.9); box(m, -3.2, 1.4, 2.0, 3.0, -2.3);

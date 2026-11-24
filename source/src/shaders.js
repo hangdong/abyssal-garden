@@ -637,6 +637,8 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
       pc = mix(pc, vec3f(.03), step(.45, i.ao) * step(i.ao, .6)); pc = mix(pc, vec3f(.62, .58, .5), step(.65, i.ao) * step(i.ao, .75));
       pc = mix(pc, vec3f(.55, .34, .3), step(.75, i.ao) * step(i.ao, .8)); pc = mix(pc, vec3f(.05, .05, .05), step(.8, i.ao) * step(i.ao, .9)); pc = mix(pc, vec3f(.02), step(.9, i.ao));
       alb = pc;
+    } else if (sd > 3. && sd < 4.) {   // a chick: grey-brown down, the beak and eye as on a gull
+      alb = mix(vec3f(.34, .29, .23) * (.75 + .5 * B.h), alb, step(.65, i.ao));
     }
     bump = .3; gloss = .3;
   } else if (mat == 15) {

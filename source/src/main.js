@@ -299,7 +299,7 @@ meshes.push(meshFluke(), meshShip().build(), meshManta().build(), meshFish().bui
   meshChunk(3).build(), meshChunk(11).build(), meshChunk(29).build(), meshChunk(5, 3).build(), meshChunk(17, 3).build(), meshChunk(41, 3).build(), meshChunk(9, 1).build(), meshCoral(0, 1).build(), meshCoral(1, 1).build(), meshChunk(5, 2, 1).build(), meshChunk(17, 2, 1).build(), meshChunk(41, 2, 1).build());
 const DECO0 = meshes.length; // palm, 2 trees, bush, step, rail, lamp
 meshes.push(meshPalm().build(), meshTree(1).build(), meshTree(2).build(), meshBush().build(), meshStep().build(), meshRail().build(), meshLamp().build(), meshBench().build(), meshTowerC().build(), meshTowerG().build(), meshTowerW().build(),
-  meshPerson(0).build(), meshPerson(1).build(), meshPerson(2).build(), meshPerson(3).build(), meshUmbrella().build(), meshSeaLion(false).build(), meshCaveFrame().build());
+  meshPerson(0).build(), meshPerson(1).build(), meshPerson(2).build(), meshPerson(3).build(), meshUmbrella().build(), meshSeaLion(false).build(), meshCaveFrame().build(), meshNest().build());
 const GAR = meshGaribaldi().build(), SNORK = meshPerson(4).build(), LIONSWIM = meshSeaLion(true).build(), SEAL = meshSeal().build(), GULL = meshGull().build(), CHIP = meshChipmunk().build();
 const BOARD = meshSurfboard().build(), SUPB = meshSUPBoard().build(), KAYAK = meshKayak().build(), PAD1 = meshPaddle(false).build(), PAD2 = meshPaddle(true).build(), FOAM = meshFoam().build(), PELICAN = meshPelican().build(), CRAB = meshCrab().build(), BLOB = meshBlob(1, 1).build(), BLOBL = meshBlob(1.9, 0.85).build(), CFISH = meshCaughtFish().build();
 meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, BLOB, BLOBL, CFISH);
@@ -343,18 +343,23 @@ const barkAt = (a, mood) => {
   const dx = a.x - F[CX], dz = a.z - F[CZ], d = hypot(dx, dz);
   BARK(clamp((dx * F[RX] + dz * F[RZ]) / (d + 1), -1, 1), (mood ? 0.8 : 0.55) * clamp(1.2 - d / 35, 0, 1), mood);
 };
+var THREATS = [];
 function updPerson(a, dt, px, pz, py) {
   if (a.ft > 0) { // just pinched: hop away from the crab
     a.ft -= dt; a.pose = 0; stepActor(a, a.x - a.fx, a.z - a.fz, 2.4, dt, -0.45); turnTo(a, atan2(a.mx, a.mz), 8, dt);
     a.amt += (1 - a.amt) * min(1, dt * 8); a.ph += 2.4 * 4.2 * dt; if (a.ft <= 0) { a.st = 3; a.tm = 0; } return;
   }
-  const dx = a.x - px, dz = a.z - pz, d = hypot(dx, dz), kid = a.sc < 0.72;
-  const R = (a.hpose === 0 ? 3.2 : 2.4) * (kid ? 1.4 : 1) * (py < -2 ? 0.3 : 1);
+  let dx = a.x - px, dz = a.z - pz, d = hypot(dx, dz); const kid = a.sc < 0.72;
+  let R = (a.hpose === 0 ? 3.2 : 2.4) * (kid ? 1.4 : 1) * (py < -2 ? 0.3 : 1);
+  // sea lions on the move (or a sea lion you play) scare people too: flee from whichever is the bigger worry
+  let alarm = false;
+  for (const t of THREATS) { const tx = a.x - t[0], tz = a.z - t[1], td = hypot(tx, tz), tr = t[2] * (kid ? 1.3 : 1); if (td < tr && td / tr < d / R) { dx = tx; dz = tz; d = td; R = tr; } else if (t[2] >= 5 && td < tr * 2.2 && td / tr < d / R) { alarm = true; dx = tx; dz = tz; } }
   let sp = 0;
   switch (a.st) {
     case 0: // at home: sit, lie, dig or stand; get up and walk away when the camera comes close
       a.pose = a.hpose;
       if (d < R) { a.st = 1; a.pose = 0; a.tm = 0; a.amt = 0; }
+      else if (alarm) { a.st = 3; a.pose = 0; a.tm = 0; a.amt = 0; }   // the pack is on the move nearby: stand up and look
       else if (a.hpose === 3) { a.ph += dt * 2.2; a.amt = 1; }
       else if (a.hpose === 1) a.amt += ((d < 9 && py > -2 ? 1 : 0) - a.amt) * min(1, dt * 3);
       else a.amt = 0;
@@ -689,14 +694,14 @@ document.body.append(HUDR);
 function roleHud() { if (typeof tbUpdate === 'function') tbUpdate(); HUDR.textContent = ROLES[ROLE] + (TOUCHUI ? '' : ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
 function setRole(r) {
   if (ROLE === 0) { DV[0] = F[CX]; DV[1] = F[CY]; DV[2] = F[CZ]; DV[3] = F[YAW]; DV[4] = F[PIT]; DV[5] = walk ? 1 : 0; DV[6] = above ? 1 : 0; }
-  ROLE = r; if (!PERCH.length) buildPerches(); perchOn = r === 2 || r === 4; walk = above = false; F[VX] = F[VY] = F[VZ] = 0; TPV = true; swapped = false; AV.vx = AV.vy = AV.vz = AV.sp = AV.mv = AV.pitch = AV.roll = 0;
+  ROLE = r; perchOn = r === 2 || r === 4; walk = above = false; F[VX] = F[VY] = F[VZ] = 0; TPV = true; swapped = false; AV.vx = AV.vy = AV.vz = AV.sp = AV.mv = AV.pitch = AV.roll = 0;
   if (r === 0) { F[CX] = DV[0]; F[CY] = DV[1]; F[CZ] = DV[2]; F[YAW] = DV[3]; F[PIT] = DV[4]; walk = !!DV[5]; above = !!DV[6]; }
   else if (r === 1) { AV.x = 143.5; AV.z = 12; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.mode = 0; AV.alert = 0.9; F[YAW] = -PI / 2; F[PIT] = -0.2; }
   else if (r === 2) { AV.x = 136; AV.y = 11; AV.z = 4; AV.hd = PI; AV.mode = 2; AV.sp = 6; F[YAW] = -PI / 2; F[PIT] = -0.1; }
   else if (r === 4) { AV.x = 132; AV.y = 10; AV.z = -6; AV.hd = PI; AV.mode = 2; AV.sp = 6.5; F[YAW] = -PI / 2; F[PIT] = -0.1; }
   else if (r === 6) { AV.x = 143.5; AV.z = 12; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.mode = 0; F[YAW] = -PI / 2; F[PIT] = -0.2; }
   else if (r === 5) { AV.x = 147; AV.z = -10; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.dig = AV.digT = 0; AV.byaw = 0; AV.pinchT = 0; F[YAW] = -PI / 2; F[PIT] = -0.25; }
-  else { F[CX] = 182.5; F[CZ] = -14; F[CY] = ground(182.5, 12, -14) + 1.7; walk = true; F[YAW] = -PI / 2; F[PIT] = -0.1; }
+  else { const T = Wd.tower; if (T) { F[CX] = T[0] - 4.8; F[CZ] = T[2] + 0.5; F[CY] = ground(F[CX], T[1] + 4.2, F[CZ]) + 1.7; } else { F[CX] = 182.5; F[CZ] = -14; F[CY] = ground(182.5, 12, -14) + 1.7; } walk = true; TPV = false; F[YAW] = -PI / 2; F[PIT] = -0.15; }   // first person: a chase camera would end up inside the cabin
   if (r === 1) { BB.x = AV.x - 1.6; BB.z = AV.z + 0.6; BB.y = ground(BB.x, 4, BB.z); BB.mode = 0; BB.hd = PI; }
   roleHud();
 }
@@ -764,7 +769,7 @@ function gullMove(dt, yaw, pitch, mf, mr, fast) {
     const hs = A.sp * cos(A.pitch), nx = A.x + cos(A.hd) * hs * dt, nz = A.z + sin(A.hd) * hs * dt; let ny = A.y + (A.sp * sin(A.pitch) + (ku - kd) * 3 - (mf < 0 ? 1.8 : 0)) * dt;   // S also settles you down gently
     if (sdp(nx, ny, nz) > -0.1) { A.sp *= 0.6; ny = A.y + dt; } else { A.x = nx; A.z = nz; }
     // touching down: on the sand or rock, or on the water, as long as you are not pressing W
-    const g = ground(A.x, min(ny + 1, 13), A.z);
+    const g = ground(A.x, min(ny + 1, 30), A.z);
     if (g > -1e8 && ny < g + 0.3) { if (mf <= 0) { A.mode = g > 0.15 ? 0 : 1; ny = g > 0.15 ? g : -0.15; A.sp = 0; A.pitch = A.roll = 0; } else ny = g + 0.3; }
     else if (g < -0.3 && ny < 0.3) { if (mf <= 0) { A.mode = 1; ny = -0.15; A.sp = 0; A.pitch = A.roll = 0; } else ny = 0.3; }
     A.y = ny > 45 ? 45 : ny; const r = hypot(A.x, A.z); if (r > 178) { A.x *= 178 / r; A.z *= 178 / r; }
@@ -843,6 +848,13 @@ function placeCamera() {
   EY[0] = ex; EY[1] = ey; EY[2] = ez; camClose = t < 1.1; F[CX] = ex - fx * t; F[CY] = ey - fy * t + up * t / D; F[CZ] = ez - fz * t; swapped = true;
 }
 const GUARDSEED = (() => { for (const a of Wd.actors) if (a.k === 'F') return a.seed; return 0.3; })();
+// the gull's nest on the tower roof: two chicks and a parent standing by
+function emitNest() {
+  const N = Wd.nest; if (!N) return; const t = F[TIME];
+  emit(8, N[0] + 0.12, N[1] + 0.1, N[2] + 0.06, 0.6, 0, 0, 3.3, 0, 0, 0.36, 13);
+  emit(8, N[0] - 0.15, N[1] + 0.1, N[2] - 0.08, 2.4, 0, 0, 3.6, 0, 0, 0.32, 13);
+  emit(8, N[0] + 1.3, N[1], N[2] - 0.7, 2.0 + 0.3 * sin(t * 0.2), 0, 0, 0.42, 0, 0, 1, 13);
+}
 function emitAvatar() {
   if (!ROLE || !TPV || camClose) return;
   const A = AV;
@@ -1048,6 +1060,9 @@ function updateActors(dt) {
     else if (a.k === 'G') { if (a.st === 0) a.y = ground(a.x, 4, a.z); else if (a.st === 1) a.y = -0.15; else { a.y = a.fy = 9 + a.seed * 4; a.hd = a.seed * 20; a.dir = a.seed < 0.5 ? -1 : 1; a.sp = 7; a.tm = 6 + a.seed * 12; } }
     else a.y = -0.3;
   } }
+  THREATS.length = 0;
+  if (ROLE === 1) THREATS.push([AV.x, AV.z, AV.chg > 0 ? 12 : AV.mv ? 7 : 3.5]);
+  for (const b of ACT) if (b.k === 'L' && !b.pup) { if (b.st === 4 || b.st === 5) THREATS.push([b.x, b.z, 11]); else if (b.st >= 1) THREATS.push([b.x, b.z, 6]); else THREATS.push([b.x, b.z, 2.2]); }
   const far = ROLE === 1 || ROLE === 2 || ROLE === 4 || ROLE === 5 || ROLE === 6 ? 1e5 : 0, px = PL[0] + far, pz = PL[2], py = PL[1];
   SLN.fill(0); BLN.fill(0);
   for (let i = 0; i < NACT; i++) {
@@ -1069,7 +1084,7 @@ function updateActors(dt) {
     f[o + 8] = k === 'P' || k === 'N' || k === 'V' ? 10 : k === 'G' ? 13 : k === 'C' ? 14 : 11; f[o + 9] = a.seed; f[o + 10] = a.ph;
     f[o + 11] = k === 'P' ? a.pose + a.amt * 0.99 : k === 'V' ? a.amt * 0.99 : k === 'N' ? 4 + a.amt * 0.99 : k === 'L' ? (a.st >= 3 ? 2 + a.lg * 0.99 : a.amt * 0.49 + (a.mv ? 0.5 : 0)) : k === 'G' ? (a.st >= 2 ? 1 + a.amt * 0.99 : a.pk * 0.49 + (a.mv ? 0.5 : 0)) : k === 'C' ? a.pose + a.amt * 0.99 : 1;
   }
-  emitAvatar(); updBaby(dt); emitSplashes(dt); addBlobs();
+  emitNest(); emitAvatar(); updBaby(dt); emitSplashes(dt); addBlobs();
   for (let s = 0; s < SLM.length; s++) if (SLN[s]) Q.writeBuffer(SLB[s], 0, SLI[s], 0, SLN[s] * 12);
 }
 const ibChunk = Wd.chunks.map((c) => buf(c.data, BU.VERTEX)), ibProp = Wd.props.map((c) => buf(c.data, BU.VERTEX));
@@ -1312,16 +1327,18 @@ function buildPerches() {
     const x = D[k][i], y = D[k][i + 1], z = D[k][i + 2], sc = D[k][i + 3], a = 2 * atan2(D[k][i + 5], D[k][i + 7]), c = cos(a), s = sin(a);
     for (const q of CROWN[key]) PERCH.push([x + (q[0] * c + q[2] * s) * sc, y + q[1] * sc, z + (-q[0] * s + q[2] * c) * sc, q[3] * sc]);
   }
+  for (const b of Wd.stairs) PERCHB.push(b);
   for (let i = 0; i < D[10].length; i += 12) {
     const x = D[10][i], y = D[10][i + 1], z = D[10][i + 2], sc = D[10][i + 3];
     PERCHB.push([x - 4.9 * sc, x + 2.1 * sc, z - 2.5 * sc, z + 2.5 * sc, y + 3.8 * sc], [x - 4.2 * sc, x - 1.7 * sc, z - 2.3 * sc, z + 2.3 * sc, y + 1.05 * sc]);
   }
 }
+buildPerches();
 // height of the ground under (x, z), searching down from y0; -1e9 where there is none within 9 m
 function ground(x, y0, z) {
-  const g = ground0(x, y0, z); if (!perchOn) return g;
+  const g = ground0(x, y0, z); if (!PERCHB.length && !perchOn) return g;
   let best = g;
-  for (const p of PERCH) if (p[1] <= y0 + 0.05 && p[1] > best && (x - p[0]) ** 2 + (z - p[2]) ** 2 < p[3] * p[3]) best = p[1];
+  if (perchOn) for (const p of PERCH) if (p[1] <= y0 + 0.05 && p[1] > best && (x - p[0]) ** 2 + (z - p[2]) ** 2 < p[3] * p[3]) best = p[1];
   for (const b of PERCHB) if (b[4] <= y0 + 0.05 && b[4] > best && x > b[0] && x < b[1] && z > b[2] && z < b[3]) best = b[4];
   return best;
 }
@@ -1401,7 +1418,8 @@ function frame(now) {
     let gh = flat || y > -3 ? ground(x, F[CY] + 1, z) : -1e9;
     if (walk) {
       const feet = F[CY] - 1.7;
-      if (gh > feet + 0.7 || (gh < feet - 1 && feet > 1)) { // a wall, a step too high, or a drop off a cliff: slide along it
+      const TW = Wd.tower, dropOK = TW && abs(F[CX] - TW[0]) < 9 && abs(F[CZ] - TW[2]) < 5 ? 1.8 : 1;   // the deck is 1.6 m above the clifftop
+      if (gh > feet + 0.7 || (gh < feet - dropOK && feet > 1)) { // a wall, a step too high, or a drop off a cliff: slide along it
         const gx = ground(x, F[CY] + 1, F[CZ]), gz = ground(F[CX], F[CY] + 1, z);
         if (gx <= feet + 0.7 && gx >= feet - 1) { z = F[CZ]; gh = gx; zv = 0; } else if (gz <= feet + 0.7 && gz >= feet - 1) { x = F[CX]; gh = gz; xv = 0; } else { x = F[CX]; z = F[CZ]; gh = ground(x, F[CY] + 1, z); xv = zv = 0; }
       }
@@ -1519,3 +1537,6 @@ render(); await Q.onSubmittedWorkDone();
 setTimeout(keep, 15e3, 'cqLoad', ''); // the load counts as survived after 15 s of frames
 ui(true);
 requestAnimationFrame((t) => { F[LAST] = t; requestAnimationFrame(frame); });
+
+
+
