@@ -12,3 +12,6 @@ try { SV = (localStorage.cq || '').split(','); bad = localStorage.cqLoad; } catc
 LV = SV[0] ? +SV[0] : mob ? (mem > 7 ? 1 : 2) : mem <= 4 ? 2 : 0;
 if (bad && LV < 2) { SV = [++LV]; keep('cq', LV); }
 const THIN = 1 << LV, SHADOW = LV ? 2048 : 4096, AA = LV > 1 ? 1 : 4, WATER = LV > 1 ? 256 : 512, RAYN = LV > 1 ? 12 : 34;
+
+// ?dbg=N shows an intermediate stage instead of the final image (1 composite runs, 2 scene, 3 shafts, 4 sky pass runs, 5 depth, 6 sky ray directions, 7 plain sky gradient)
+const DBG = +new URLSearchParams(location.search).get('dbg') || 0;

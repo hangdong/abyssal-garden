@@ -22,7 +22,12 @@ if (!adapter) fail('No WebGPU adapter found.');
 $('w').hidden = !!navigator.userAgentData; // only Chromium-based browsers have it
 const hasTS = adapter.features.has('timestamp-query');
 const device = await adapter.requestDevice({ requiredFeatures: hasTS ? ['timestamp-query'] : [] });
-device.addEventListener('uncapturederror', (e) => console.error('GPU: ' + e.error.message));
+// GPU errors go on screen as well (phones have no console), under ?dbg=N or after any error
+const errBox = document.createElement('pre'); errBox.style.cssText = 'position:fixed;left:0;bottom:0;right:0;max-height:40vh;overflow:auto;margin:0;padding:.5em;background:#300c;color:#fff;font:11px/1.3 monospace;white-space:pre-wrap;z-index:9;pointer-events:none;display:none';
+document.body.append(errBox);
+const showErr = (t) => { errBox.style.display = 'block'; errBox.textContent += t + '\n'; };
+device.addEventListener('uncapturederror', (e) => { console.error('GPU: ' + e.error.message); showErr('GPU: ' + e.error.message.slice(0, 400)); });
+if (DBG) { const ai = adapter.info || {}; showErr('dbg=' + DBG + ' ' + [ai.vendor, ai.architecture, ai.description].join(' ') + ' fmt=' + navigator.gpu.getPreferredCanvasFormat() + ' AA=' + AA + ' LV=' + LV); }
 // out of memory or a GPU timeout: reload a level lower, or on Low say what happened
 device.lost.then((l) => {
   if (l.reason === 'destroyed') return; // the page is closing

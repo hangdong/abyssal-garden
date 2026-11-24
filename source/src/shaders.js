@@ -972,6 +972,9 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f };
 }
 @fragment fn fsB(i: VO) -> @location(0) vec4f {
   let rd = normalize(i.wp - g.cam.xyz);
+  if (${DBG} == 4) { return vec4f(1., 0., 1., 1.); }   // debug: the sky pass runs
+  if (${DBG} == 6) { return vec4f(rd * .5 + .5, 1.); }   // debug: ray directions
+  if (${DBG} == 7) { return vec4f(mix(vec3f(.3, .6, 1.), vec3f(1.), sat(rd.y)), 1.); }   // debug: a plain gradient
   if (g.cam.y > 0.) { return fin(skyAt(vec3f(rd.x, abs(rd.y), rd.z))); }
   let p = g.cam.xyz + rd * 240.;
   return fin(fog(vec3f(0.), p, zone(p)));
@@ -1109,6 +1112,7 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
 fn sat3(x: vec3f) -> vec3f { return clamp(x, vec3f(0.), vec3f(1.)); }
 @fragment fn fs(@builtin(position) fc: vec4f) -> @location(0) vec4f {
   let px = vec2i(fc.xy);
+  if (${DBG} == 1) { return vec4f(1., 0., 0., 1.); }   // debug: the composite pass runs
   let uv = fc.xy * g.res.zw;
   let zf = min(g.fwd.w / max(textureLoad(tDp, px, 0), 1e-6), 2e4);
   // depth-aware upsample of the half-res shafts
@@ -1122,6 +1126,9 @@ fn sat3(x: vec3f) -> vec3f { return clamp(x, vec3f(0.), vec3f(1.)); }
     let w = (bw + .02) / (.02 + abs(r.a - zf) / zf);
     acc += r.rgb * w; ws += w;
   }
+  if (${DBG} == 2) { return vec4f(textureLoad(tS, px, 0).rgb * .3, 1.); }   // debug: the scene alone
+  if (${DBG} == 3) { return vec4f(acc / max(ws, 1e-6) * .3, 1.); }   // debug: the light shafts alone
+  if (${DBG} == 5) { return vec4f(vec3f(zf / 2e4), 1.); }   // debug: depth
   var c = textureLoad(tS, px, 0).rgb + acc / max(ws, 1e-6);
   let bl = textureSampleLevel(tB, sC, uv, 0.).rgb;
   c = mix(c, bl, .06) + bl * .03;
