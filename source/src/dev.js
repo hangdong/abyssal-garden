@@ -3,7 +3,7 @@
 // ============================================================================
 //   F    fly the camera along the scripted path (FLY in main.js), one minute through the whole world
 //   B    the same flight as a benchmark: the resolution stays fixed, every frame is timed, the result is shown at the end
-//   F, B or 1-6 during a flight stop it
+//   F, B or 1-8 during a flight stop it
 {
   const LOGN = 1 << 16, logFrame = new Float32Array(LOGN), logGpu = new Float32Array(LOGN);
   let flying = false, bench = false, last = 0, nFrame = 0, nGpu = 0;
@@ -34,6 +34,6 @@
         // a benchmark hides the stats line and holds the resolution: dynT at -Infinity keeps frame() from tuning it
         if (bench) { hud = false; info.textContent = ''; dynT = -Infinity; }
       }
-    } else if (/Digit[1-6]/.test(e.code)) stop();
+    } else if (/Digit[1-8]/.test(e.code)) stop();
   });
 }

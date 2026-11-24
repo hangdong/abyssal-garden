@@ -1,7 +1,7 @@
 {
-  "name": "abyssal-garden",
+  "name": "coastal-quest",
   "private": true,
-  "description": "A procedural underwater world rendered with WebGPU, bundled into one HTML file",
+  "description": "A procedural coastal cove, above and under the water, rendered with WebGPU and bundled into one HTML file",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",

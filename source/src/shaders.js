@@ -72,14 +72,33 @@ fn dens(p: vec3f) -> f32 {
     d = smax(d, b.y - length(vec2f(length(r.xy) - b.x, r.z)), 1.5);
   }
   let hg = p.y - g0;
-  let rk = mix(.25, 1., ss(.5, 5., hg));
+  let rk = mix(.25, 1., ss(.5, 5., hg)) * (1. - .88 * ss(110., 140., p.x) * ss(88., 64., abs(p.z)) * ss(6., 10., p.y));
   d += rk * ((.5 - wor(p * .17 + w * 2.)) * 3.4 + (.5 - wor(p * .41 + 7.)) * 1.3 + (fbm(p * .3, 3) - .5) * 2.2);
   d += rk * 2.2 * (abs(fract(p.y * .21 + w.y * 2.2) - .5) - .25);
   for (var i = 0u; i < u.c.z; i++) {
     let a = P[k]; let b = P[k + 1u]; k += 2u;
     d = smin(d, seg3(p + w * 2., a.xyz, b.xyz) - a.w, 2.);
   }
-  return min(d, 3. - p.y);
+  // the cove on the east edge: a sand shelf, gentle near the shore and dropping away offshore, with the waterline curving inland
+  let bz = abs(p.z) / 40.;
+  let bo = 130. + 14. * (1. - min(bz * bz, 1.)) - p.x;
+  let bh = min(-.1 * bo - 41. * ss(8., 78., bo), 2.8) + 1.1 * (fbm(vec3f(p.xz * .045, 4.), 2) - .5);
+  d = smax(d, (mix(-60., bh, ss(62., 40., abs(p.z))) - p.y) * .7, 3.);
+  // the clifftop: a flat plateau 10 m up behind the cove and on its two points, and a stairway up the side of each point
+  var tp = mix(-60., 10.05 - p.y, ss(166., 173., length(p.xz)) * ss(100., 78., abs(p.z)));
+  for (var s = 0; s < 2; s++) {
+    let k = f32(s) * 2. - 1.;
+    tp = max(tp, min(10.05 - p.y, 6.2 - seg2(p.xz, vec2f(172., k * 47.), vec2f(118., k * 43.))));
+    let a = vec3f(138., .4, k * 34.5); let b = vec3f(170., 10.05, k * 37.5);
+    let ab = b.xz - a.xz; let L = length(ab); let u = ab / L; let q = p.xz - a.xz; let t = dot(q, u);
+    let hr = mix(a.y, b.y, clamp(t / L, 0., 1.)); let lat = abs(q.x * u.y - q.y * u.x); let al = min(t + .5, L + 1.5 - t);
+    d = min(d, -min(min(p.y - hr + .05, hr + 3.4 - p.y), min(2.4 - lat, al)));
+    tp = max(tp, min(min(hr - p.y, 1.7 - lat), al));
+  }
+  d = smax(d, tp, .6);
+  // a sea cave under the south point: two arched tunnels side by side, right through
+  for (var c = 0; c < 2; c++) { d = min(d, seg3(p, vec3f(126. + 6. * f32(c), 1.3, 30.), vec3f(126. + 6. * f32(c), 1.3, 57.)) - 2.3 - .2 * sin(p.y * 2.3 + f32(c))); }
+  return min(d, 14. - 4. * ss(95., 112., p.x) * ss(80., 55., abs(p.z)) - p.y);
 }
 @compute @workgroup_size(4, 4, 4) fn main(@builtin(global_invocation_id) id: vec3u) {
   if (any(id >= u.n.xyz)) { return; }
@@ -198,6 +217,8 @@ const KDZ = vec3f(.034, .023, .018);
 const PCOL = vec3f(.58, .66, .98);
 const SUNC = vec3f(1.7, 1.6, 1.45);
 const TAU = 6.2831853;
+const AIRK = 2.0;
+const AIRA = 1.2;
 const LOW = ${LV > 1};
 fn sat(x: f32) -> f32 { return clamp(x, 0., 1.); }
 fn ss(a: f32, b: f32, x: f32) -> f32 { let t = clamp((x - a) / (b - a), 0., 1.); return t * t * (3. - 2. * t); }
@@ -247,24 +268,60 @@ fn caus(p: vec3f, d: f32) -> vec3f {
   let a = vec3f(textureSample(tW, sR, q / 3.3 + o).r, textureSample(tW, sR, q / 3.3).r, textureSample(tW, sR, q / 3.3 - o).r);
   let b = textureSample(tW, sR, q.yx / 6.9 + .37).r;
   let c = min(pow(a, vec3f(2.3)) * 5. * (.45 + b * 1.3), vec3f(4.));
-  return mix(c, vec3f(.33), ss(35., 100., d));
+  return mix(vec3f(.33), mix(c, vec3f(.33), ss(35., 100., d)), ss(.4, -.4, p.y));
 }
 fn caus2(p: vec3f, d: f32) -> f32 {
   let q = cuv(p);
   let c = min(pow(textureSample(tW, sR, q / 4.1).r, 1.4) * 2.6 * (.45 + textureSample(tW, sR, q.yx / 6.9 + .37).r * 1.3), 2.6);
   return mix(c, .33, ss(35., 100., d));
 }
-fn sunE(y: f32, z: f32) -> vec3f { return SUNC * exp(kd(z) * (min(y, 0.) / g.sun.y)) * (.5 + .5 * sat(-y / 30.)); }
-fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.); }
+fn sunE(y: f32, z: f32) -> vec3f { return SUNC * exp(kd(z) * (min(y, 0.) / g.sun.y)) * (.5 + .5 * sat(-y / 30.)) * (1. + AIRK * ss(-.3, .3, y)); }
+fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., ${NY * VS}, 384.), 0.); }
 fn amb(p: vec3f, n: vec3f, sky: f32, z: f32) -> vec3f {
   let up = n.y * .5 + .5;
-  return mix(vec3f(.22, .60, .80), vec3f(.34, .56, .82), z) * exp(kd(z) * min(p.y, 0.) * 1.2) * (.3 + .7 * sky) * (.24 + .76 * up * up) * 1.3 * (.55 + .45 * sat(-p.y / 30.)) + vec3f(.003, .010, .016);
+  return mix(mix(vec3f(.22, .60, .80), vec3f(.34, .56, .82), z), vec3f(.52, .64, .78), ss(-.3, .3, p.y)) * exp(kd(z) * min(p.y, 0.) * 1.2) * (.3 + .7 * sky) * (.24 + .76 * up * up) * 1.3 * (.55 + .45 * sat(-p.y / 30.)) * (1. + AIRA * ss(-.3, .3, p.y)) + vec3f(.003, .010, .016);
 }
 fn zone(p: vec3f) -> f32 { return mix(g.sun.w, textureSampleLevel(tM, sC, p.xz / 384. + .5, 0.).b, .2); }
-fn side(p: vec3f, n: vec3f, open: f32, z: f32) -> vec3f { return mix(WCOL, PCOL, z) * exp(kd(z) * min(p.y, 0.)) * open * (1. - abs(n.y)) * .7; }
+fn side(p: vec3f, n: vec3f, open: f32, z: f32) -> vec3f { return mix(WCOL, PCOL, z) * exp(kd(z) * min(p.y, 0.)) * open * (1. - abs(n.y)) * .7 * (1. - .75 * ss(-.3, .3, p.y)); }
+// people and swimmers: the aux value of a vertex picks the part (skin .15, top .4, bottom .6, hair .78, bright .93)
+fn skinC(h: f32) -> vec3f { return mix(vec3f(.55, .34, .22), vec3f(.13, .07, .045), h * h); }
+fn topC(h: f32) -> vec3f {
+  if (h < .16) { return vec3f(.55, .05, .05); } if (h < .32) { return vec3f(.75, .55, .05); } if (h < .48) { return vec3f(.02, .35, .38); }
+  if (h < .64) { return vec3f(.6, .12, .3); } if (h < .8) { return vec3f(.55, .55, .5); } return vec3f(.04, .12, .5);
+}
+fn botC(h: f32) -> vec3f {
+  if (h < .25) { return vec3f(.03, .06, .22); } if (h < .5) { return vec3f(.28, .22, .12); } if (h < .75) { return vec3f(.02, .02, .03); } return vec3f(.02, .3, .35);
+}
+fn partC(ao: f32, sd: f32) -> vec3f {
+  let a = fract(sd * 13.7); let b = fract(sd * 7.3 + .31); let c = fract(sd * 3.9 + .7);
+  if (ao < .3) { return skinC(a); }
+  if (ao < .5) { return topC(b); }
+  if (ao < .7) { return botC(c); }
+  if (ao < .85) { return mix(vec3f(.02, .015, .01), vec3f(.35, .22, .08), step(.75, a) * c); }
+  if (ao > .97) { return vec3f(.92, .95, .95); }
+  return mix(vec3f(.9, .35, .05), vec3f(.1, .5, .8), step(.5, b)) * (.7 + .3 * c);
+}
+// the sky seen from above the water
+fn skyAt(rd: vec3f) -> vec3f {
+  let h = sat(rd.y);
+  var c = mix(vec3f(1.7, 2.3, 2.9), vec3f(.28, .75, 2.3), pow(h, .4));
+  let mu = max(dot(rd, g.sun.xyz), 0.);
+  c += vec3f(1., .93, .8) * (pow(mu, 6.) * .2 + pow(mu, 60.) * .5 + pow(mu, 1500.) * 60.);
+  return c;
+}
 // skylight at most 150 m along the ray: past that, terrain and the background behind it (vsB) get the same haze
 fn fog(c: vec3f, wp: vec3f, z: f32) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
+  if (g.cam.y > 0.) {
+    // above the water: clear air, and under the surface the ray first crosses the surface (refraction ignored)
+    var cc = c; var da = d;
+    if (wp.y < 0.) {
+      da = min(g.cam.y / (g.cam.y - wp.y) * d, d);
+      let p0 = g.cam.xyz + rd * da; let dw = d - da;
+      cc = c * exp(-sg(z) * dw) + fogIn(p0, rd, dw, z, g.sun.xyz) * (.58 + .42 * vol(p0 + rd * min(dw, 150.)).g);
+    }
+    return mix(cc * ss(230., 185., d), skyAt(vec3f(rd.x, 0., rd.z)) * .8, 1. - exp(-da * .0011));
+  }
   return c * exp(-sg(z) * d) * ss(230., 185., d) + fogIn(g.cam.xyz, rd, d, z, g.sun.xyz) * (.58 + .42 * vol(g.cam.xyz + rd * min(d, 150.)).g);
 }
 fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
@@ -275,15 +332,167 @@ const W_SOLID = S_B + /*wgsl*/`
 struct VI { @location(0) p: vec3f, @location(1) n: vec4f, @location(2) a: vec4f, @location(3) b: vec4f, @location(4) c: vec4f };
 struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n: vec3f, @location(2) op: vec3f, @location(3) on: vec3f,
   @location(4) @interpolate(flat) m: vec4f, @location(5) @interpolate(flat) q: vec4f, @location(6) ao: f32 };
+fn rotX(p: vec3f, c: vec3f, a: f32) -> vec3f { let d = p - c; let s = sin(a); let k = cos(a); return c + vec3f(d.x, d.y * k - d.z * s, d.y * s + d.z * k); }
+fn rotY(p: vec3f, c: vec3f, a: f32) -> vec3f { let d = p - c; let s = sin(a); let k = cos(a); return c + vec3f(d.x * k + d.z * s, d.y, d.z * k - d.x * s); }
+fn rotZ(p: vec3f, c: vec3f, a: f32) -> vec3f { let d = p - c; let s = sin(a); let k = cos(a); return c + vec3f(d.x * k - d.y * s, d.x * s + d.y * k, d.z); }
+// People (material 10) and sea lions (11) are posed in the vertex shader. c.z is the gait / kick phase and c.w = pose + amount * .99
+// (people: 0 standing and walking, 1 sitting and waving, 2 lying, 3 crouching and digging, 4 snorkeler with head up; sea lions: 0 on land, 1 swimming;
+// a sea lion's amount is .49 * head raise + .5 when it is moving). Heads turn to look at the camera.
+fn animActor(i: VI) -> vec3f {
+  var p = i.p; let t = g.cam.w; let sd = i.c.y; let ph = i.c.z;
+  let pose = floor(i.c.w); let r = i.c.w - pose;
+  let dv = g.cam.xyz - i.a.xyz; let lq = qrot(vec4f(-i.b.xyz, i.b.w), dv); let near = ss(30., 12., length(dv));
+  let q0 = p;
+  if (i.c.x > 12.5) {
+    let amt = r / .99; let mvx = step(.5, r); let pk = (r - mvx * .5) / .49; let lk = clamp(atan2(lq.x, lq.z), -1., 1.) * near;
+    if (i.c.x < 13.5) {            // gull: wings (aux .3 and .5) fold on the ground and flap in flight
+      let wing = step(.25, i.n.w) * step(i.n.w, .55); let side = select(-1., 1., q0.z > 0.);
+      if (pose < .5 || pose > 1.5) {   // on the ground, afloat or diving: the wings fold back
+        p = mix(p, rotY(p, vec3f(.06, .3, side * .05), -side * 1.32), wing);
+        if (wing > .5) { p = rotX(p, vec3f(.0, .3, side * .1), side * .25); }
+        if (q0.x > .27) { p = rotZ(p, vec3f(.26, .38, 0.), -pk * .95); }
+        if (q0.y < .17 && abs(q0.z) > .02 && q0.x > -.05 && q0.x < .12) { p = rotZ(p, vec3f(.01, .18, 0.), sin(ph + select(0., 3.14159, q0.z > 0.)) * .55 * mvx); }
+      } else {
+        p = mix(p, rotX(p, vec3f(.06, .3, side * .06), -side * sin(ph) * (.12 + .6 * amt) + side * .12), wing);
+        p.y += sin(ph) * .01 * amt;
+        if (q0.y < .17 && q0.x > -.05 && q0.x < .12) { p = rotZ(p, vec3f(.01, .18, 0.), 1.25); }   // legs tucked back
+      }
+      if (q0.x > .3) { p = rotY(p, vec3f(.26, .38, 0.), lk * .7); }
+    } else {                        // chipmunk: run, or sit up and beg
+      let fw = step(.03, q0.x) * step(q0.y, .04); let hw = step(q0.x, -.02) * step(q0.y, .045); let side = select(-1., 1., q0.z > 0.);
+      if (pose < .5) {
+        if (fw > 0.) { p = rotZ(p, vec3f(.045, .04, 0.), sin(ph + select(0., 3.14, q0.z > 0.)) * .9 * amt); }
+        if (hw > 0.) { p = rotZ(p, vec3f(-.04, .04, 0.), sin(ph + select(3.14, 0., q0.z > 0.) + 1.2) * .9 * amt); }
+        p = rotZ(p, vec3f(-.02, .04, 0.), sin(ph) * .1 * amt * ss(-.04, .04, q0.x));
+        p.y += abs(sin(ph)) * .014 * amt;
+      } else {
+        p = mix(p, rotZ(p, vec3f(-.05, .03, 0.), amt * 1.25), ss(-.05, .03, q0.x) * (1. - hw));
+        if (q0.x > .07) { p = rotZ(p, vec3f(.07, .08, 0.), sin(ph * 6.) * .13 * amt); }
+      }
+      p.z += sin(t * 5. + sd * 20.) * .008 * ss(-.09, -.15, q0.x);
+      if (q0.x > .07) { p = rotY(p, vec3f(.075, .06, 0.), lk * .8); }
+    }
+  } else if (i.c.x < 10.5) {
+    let amt = r / .99;
+    var look = mix(sin(t * .35 + sd * 40.) * .5, clamp(atan2(lq.x, lq.z), -1.1, 1.1), near);
+    if (pose < .5) {
+      let side = select(-1., 1., q0.x > 0.); let s = ph + select(3.14159, 0., q0.x > 0.);
+      if (abs(q0.x) > .03 && q0.y < .96) {
+        if (q0.y < .52) { p = rotX(p, vec3f(side * .1, .5, .02), max(0., sin(s + 1.1)) * .9 * amt); }
+        p = rotX(p, vec3f(side * .1, .92, 0.), sin(s) * .6 * amt);
+      }
+      let aw = ss(.12, .2, abs(q0.x)) * step(.78, q0.y) * step(q0.y, 1.47);
+      if (aw > 0.) {
+        var pa = p;
+        if (q0.y < 1.12) { pa = rotX(pa, vec3f(side * .23, 1.22, 0.), -.45 * amt - .1); }
+        p = mix(p, rotX(pa, vec3f(side * .2, 1.42, 0.), -sin(s) * .55 * amt), aw);
+      }
+      p.y += sin(t * 1.8 + sd * 9.) * .004 * ss(1.1, 1.4, q0.y);
+      if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.52, 0.), look * .9); }
+    } else if (pose < 1.5) {
+      let aw = ss(.12, .19, q0.x) * step(.36, q0.y) * step(q0.y, .72);
+      p = mix(p, rotZ(p, vec3f(.2, .66, -.08), amt * 2.3 + sin(t * 7. + sd * 9.) * .22 * amt), aw);
+      if (q0.y > .8) { p = rotY(p, vec3f(0., .8, -.05), look * .9); }
+    } else if (pose < 2.5) {
+      if (q0.z < -1.52) { p = rotY(p, vec3f(0., 0., -1.52), look * .7); }
+      p.y += sin(t * 1.5 + sd * 9.) * .006 * ss(-.4, -1.2, q0.z);
+    } else if (pose < 3.5) {
+      let aw = step(.14, abs(q0.x)) * step(q0.y, .66) * step(.04, q0.y);
+      let side = select(-1., 1., q0.x > 0.);
+      if (aw > 0.) { p = rotX(p, vec3f(side * .19, .64, .1), sin(ph * 3. + side) * .5 * amt); }
+      if (q0.y > .74) { p = rotY(p, vec3f(0., .74, .15), look * .9); }
+    } else if (pose < 4.5) {
+      if (q0.x > .58) { p = rotZ(p, vec3f(.5, 0., 0.), amt * .85); p = rotY(p, vec3f(.5, 0., 0.), look * .5 * amt); }
+      p.y += sin(ph - q0.x * 5.) * .09 * max(-q0.x - .1, 0.);
+    } else if (pose < 5.5) {         // lifeguard: one arm points, the other hand goes to the mouth, the head nods as he shouts
+      let side = select(-1., 1., q0.x > 0.); let aw = ss(.12, .2, abs(q0.x)) * step(.78, q0.y) * step(q0.y, 1.47);
+      if (aw > 0.) {
+        var pa = p;
+        if (q0.y < 1.12) { pa = rotX(pa, vec3f(side * .23, 1.22, 0.), select(-.9, -.1, side > 0.) * amt); }
+        p = mix(p, rotX(pa, vec3f(side * .2, 1.42, 0.), select(-1.9, -1.45 + sin(t * 10.) * .12, side > 0.) * amt), aw);
+      }
+      if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.52, 0.), look * .9); p = rotX(p, vec3f(0., 1.52, 0.), -.12 * amt * (.5 + .5 * sin(t * 10.))); }
+    } else if (pose < 6.5) {         // kayaker (sitting mesh): the arms row, the body twists
+      let side = select(-1., 1., q0.x > 0.); let aw = ss(.12, .19, abs(q0.x)) * step(.36, q0.y) * step(q0.y, .72);
+      p = mix(p, rotX(p, vec3f(side * .2, .66, -.08), sin(ph + select(0., 3.14159, q0.x > 0.)) * .55), aw);
+      if (q0.y > .3) { p = rotY(p, vec3f(0., .3, 0.), sin(ph) * .2); }
+      if (q0.y > .8) { p = rotY(p, vec3f(0., .8, -.05), look * .8); }
+    } else if (pose < 7.5) {         // paddle boarder: leans into each stroke, both arms on the paddle
+      let side = select(-1., 1., q0.x > 0.); let aw = ss(.12, .2, abs(q0.x)) * step(.78, q0.y) * step(q0.y, 1.47);
+      p = rotX(p, vec3f(0., 0., 0.), sin(ph) * .1 * ss(0., 1.2, q0.y));
+      p = mix(p, rotX(p, vec3f(side * .2, 1.42, 0.), -.65 - sin(ph) * .3), aw);
+      if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.52, 0.), look * .9); }
+    } else if (pose < 8.5) {         // surfer paddling out, prone (snorkeler mesh): head up, arms stroke
+      let side = select(-1., 1., q0.z > 0.); let aw = step(.1, abs(q0.z)) * step(-.25, q0.x) * step(q0.x, .55);
+      p = mix(p, rotZ(p, vec3f(.48, 0., side * .16), sin(ph + select(0., 3.14159, q0.z > 0.)) * .9), aw);
+      if (q0.x > .58) { p = rotZ(p, vec3f(.5, 0., 0.), .55); p = rotY(p, vec3f(.5, 0., 0.), look * .4); }
+      p.y += sin(ph * 2. - q0.x * 5.) * .03 * max(-q0.x - .1, 0.);
+    } else {                         // surfer riding: knees bent, leaning forward, arms out for balance
+      let side = select(-1., 1., q0.x > 0.);
+      if (abs(q0.x) > .03 && q0.y < .96) {
+        if (q0.y < .52) { p = rotX(p, vec3f(side * .1, .5, .02), .95); }
+        p = rotX(p, vec3f(side * .1, .92, 0.), -.6);
+      }
+      let aw = ss(.12, .2, abs(q0.x)) * step(.78, q0.y) * step(q0.y, 1.47);
+      p = mix(p, rotZ(p, vec3f(side * .2, 1.42, 0.), side * (1.15 + sin(t * 3. + sd * 9.) * .15)), aw);
+      let lean = step(.9, q0.y);
+      p = mix(p, rotX(p, vec3f(0., .9, 0.), .4), lean);
+      p.y -= .22 * ss(.1, 1., q0.y);
+      if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.45, 0.), look * .5); }
+    }
+  } else {
+    let mv = step(.5, r); let alert = (r - mv * .5) / .49;
+    let lyaw = clamp(atan2(-lq.z, lq.x), -1., 1.) * near;
+    if (pose < .5 || pose > 1.5) {
+      let ag = step(1.5, pose); let lg = r / .99 * ag; let al = mix(alert, 1., ag); let rest = 1. - al;
+      p.y *= mix(1., 1. + .03 * sin(t * 1.7 + sd * 30.), ss(.6, -.2, q0.x));
+      // resting: the neck lowers, the fore flippers splay out and the chest settles; aggressive: the head lunges
+      let nk = select(rest * .55, lg * .85 - sin(ph * .8) * .1 * (1. - lg), ag > .5);
+      p = mix(p, rotZ(p, vec3f(.46, .62, 0.), -nk), ss(.45, .8, q0.x));
+      p.x += ag * lg * .4 * ss(.4, .9, q0.x);
+      if (step(.28, q0.x) * step(q0.x, .75) * step(.12, abs(q0.z)) * step(q0.y, .6) > 0.) { p = rotX(p, vec3f(.4, .4, sign(q0.z) * .22), -sign(q0.z) * rest * 1.1); }
+      p = mix(p, rotZ(p, vec3f(-.45, .17, 0.), -rest * .45), ss(-.5, .1, q0.x));
+      if (mv > .5 || ag > .5) {
+        p = rotZ(p, vec3f(-.1, .2, 0.), sin(ph) * .1); p.y += abs(sin(ph)) * .08;
+        let fw = step(.3, q0.x) * step(q0.x, .75) * step(.1, abs(q0.z)) * step(q0.y, .45);
+        if (fw > 0.) { p = rotY(p, vec3f(.4, .1, sign(q0.z) * .2), sin(ph + step(0., q0.z) * 3.14159) * .7); }
+      }
+      p = mix(p, rotY(p, vec3f(.55, .7, 0.), lyaw * .8), ss(.55, .9, q0.x));
+    } else {
+      let seal = step(5., sd);
+      p.z += sin(ph + q0.x * 3.) * mix(.07, .035, seal) * (.7 - q0.x);
+      if (seal > .5) { p.z += sin(ph * 1.3 + q0.x * 2.) * .16 * ss(-.5, -1.2, q0.x); }   // a seal swims with its hind flippers
+      else if (step(.1, q0.x) * step(q0.x, .55) * step(.12, abs(q0.z)) > 0.) { p = rotY(p, vec3f(.45, -.05, sign(q0.z) * .22), -sign(q0.z) * sin(ph * .9) * .55); }   // a sea lion rows with its fore flippers
+      p = mix(p, rotY(p, vec3f(.6, .05, 0.), lyaw * .5), ss(.6, .95, q0.x));
+    }
+  }
+  return p;
+}
 @vertex fn vs(i: VI) -> VO {
   var o: VO;
   var sc = i.a.w;
   if (i.c.x < 1.5 && i.c.z > 1.5 && g.res.x > 0.) { sc *= 1. - ss(i.c.z * .7, i.c.z, distance(i.a.xyz, g.cam.xyz) / g.mis.z); }
-  var w = i.a.xyz + qrot(i.b, i.p * sc);
-  w.y += sin(g.cam.w * .3 + i.c.y * 40.) * i.c.w;
+  var lp = i.p;
+  if ((i.c.x > 9.5 && i.c.x < 11.5) || i.c.x > 12.5) { lp = animActor(i); }
+  var w = i.a.xyz + qrot(i.b, lp * sc);
+  if (i.c.x < 9.5) { w.y += sin(g.cam.w * .3 + i.c.y * 40.) * i.c.w; }
+  if (i.c.x > 5.5 && i.c.x < 6.5) { let hh = max(i.p.y, 0.) * sc; let t = g.cam.w; w += vec3f(sin(t * 1.3 + i.c.y * 40. + hh * .3), 0., cos(t * 1.1 + i.c.y * 30. + hh * .3)) * .004 * hh * hh * (1. + .5 * sin(t * .37 + i.c.y * 9.)); }
   o.cp = g.vp * vec4f(w, 1.); o.wp = w; o.n = qrot(i.b, i.n.xyz); o.op = i.p * i.a.w + i.c.y * 37.; o.on = i.n.xyz;
   o.m = i.c; o.q = i.b; o.ao = i.n.w;
   return o;
+}
+fn sgd(p: vec2f, a: vec2f, b: vec2f) -> f32 { let pa = p - a; let ba = b - a; return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0., 1.)); }
+// the promenade along the cliff top
+fn pathD(p: vec2f) -> f32 {
+  var d = 99.;
+  for (var s = 0; s < 2; s++) {
+    let k = f32(s) * 2. - 1.;
+    d = min(d, sgd(p, vec2f(122., k * 43.4), vec2f(172., k * 46.6)));
+    d = min(d, sgd(p, vec2f(122., k * 40.), vec2f(122., k * 47.)));
+    d = min(d, sgd(p, vec2f(170., k * 37.5), vec2f(172., k * 46.6)));
+    d = min(d, sgd(p, vec2f(172., k * 46.6), vec2f(180., k * 24.)));
+  }
+  return min(d, sgd(p, vec2f(180., -24.), vec2f(180., 24.)));
 }
 struct TP { h: f32, c: f32, n: vec3f };
 fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
@@ -300,7 +509,7 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
   let mat = i32(i.m.x + .5); let sd = i.m.y; let fl_ = select(-1., 1., ff);
   let on = normalize(i.on) * fl_; let n0 = normalize(i.n) * fl_;
   let dist = length(i.wp - g.cam.xyz);
-  let ts = select(1., i.m.z, mat >= 2);
+  let ts = select(1., i.m.z, mat >= 2 && mat < 10);
   let A = tri(i.op, on, .1 * ts); let B = tri(i.op, on, .43 * ts); let C = tri(i.op, on, 1.9 * ts); let F = tri(i.op, on, 6.7 * ts); let fk = ss(10., 1.5, dist) * f32(mat <= 1);
   let Wd = textureSample(tD, sR, vec2f(i.op.x * .06, (i.op.y + i.op.z) * .7));
   let big = textureSample(tD, sR, i.op.xz * .013 + i.op.y * .021).a;
@@ -311,6 +520,7 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
   let gm = textureSample(tM, sC, i.wp.xz / 384. + .5);
   let ca = caus(i.wp, dist);
   let hgt = A.h * .5 + B.h * .35 + C.h * .15;
+  var sandk = 0.;
   var bump = 1.7; var gloss = .1; var alb = vec3f(0.); var emi = vec3f(0.); var vao = 1.; var flu = 0.;
   let flt = ss(.72, .93, n0.y);
   if (mat <= 1) {
@@ -320,10 +530,10 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
     alb = mix(vec3f(.11, .12, .13), vec3f(.33, .30, .25), sat(A.c * 1.5 - .25));
     alb = mix(alb, mix(vec3f(.26, .19, .10), vec3f(.20, .22, .14), bed), ss(.42, .66, big) * .7);
     alb *= mix(.72, 1.15, bed) * (1. - .45 * ss(.12, .0, sf) * (1. - abs(on.y)));
-    let enc = ss(.46, .6, big2 * .6 + B.c * .5) * ss(.3, .6, hgt);
+    let enc = ss(.46, .6, big2 * .6 + B.c * .5) * ss(.3, .6, hgt) * ss(.8, -.3, i.wp.y);
     alb = mix(alb, mix(vec3f(.34, .07, .10), vec3f(.40, .25, .07), ss(.45, .6, A.c)) * (.5 + .8 * B.h), enc * .75);
     alb = mix(alb, vec3f(.50, .50, .46) * (.5 + .7 * C.h), ss(.60, .70, B.c * .6 + C.c * .5) * .5);
-    let alg = ss(-.1, .6, n0.y) * ss(.3, .52, B.c * .55 + big * .5);
+    let alg = ss(-.1, .6, n0.y) * ss(.3, .52, B.c * .55 + big * .5) * ss(.6, -.4, i.wp.y);
     alb = mix(alb, vec3f(.035, .14, .07), alg * .8);
     alb *= (.22 + 1.3 * hgt) * mix(1., .62 + .76 * F.h, fk);
     sgro = -ss(.14, .0, sf) * (1. - abs(on.y)) * 1.2;
@@ -333,6 +543,21 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
       alb = mix(alb, vec3f(.20, .02, .12) * (.4 + .9 * B.h), mg * .8);
       flu = mg * .35;
       alb = mix(alb, alb * vec3f(.85, .8, 1.4) + vec3f(.015, .0, .05), gm.b * .8);
+      // cove: layered sandstone, pale dry sand, turf and a promenade on top
+      let band = .72 + .4 * sin(i.wp.y * 2.7 + A.h * 3.) + .15 * sin(i.wp.y * 9. + B.h * 4.);
+      let sstone = vec3f(.40, .30, .18) * band * (.6 + .7 * A.h) * mix(.8, 1.2, bed);
+      alb = mix(alb, sstone, gm.g * (1. - flt) * ss(-3., 1., i.wp.y) * .9);
+      alb = mix(alb, alb * vec3f(1.5, 1.2, .8) + vec3f(.03, .015, .0), gm.g * (1. - flt) * .5);
+      sandk = gm.g * flt * ss(-36., -14., i.wp.y);
+      let sandc = mix(vec3f(.27, .21, .13), vec3f(.58, .49, .34), ss(-.6, .4, i.wp.y)) * (.8 + .3 * B.h);
+      alb = mix(alb, sandc, sandk * .95);
+      alb *= mix(1., mix(.58, 1., ss(.0, 1.6, i.wp.y)), sandk * step(0., i.wp.y));
+      let top = ss(8.6, 9.6, i.wp.y) * flt * gm.g; let pd = pathD(i.wp.xz);
+      alb = mix(alb, vec3f(.07, .15, .04) * (.6 + .9 * B.h) * (.7 + .6 * A.c), top * ss(1.6, 2.4, pd) * .92);
+      let jn = max(ss(.94, 1., fract(i.wp.x / 2.4)), ss(.94, 1., fract(i.wp.z / 2.4)));
+      alb = mix(alb, vec3f(.58, .56, .51) * (.85 + .2 * B.h) * (1. - .35 * jn), top * ss(2.1, 1.7, pd));
+      alb = mix(alb, vec3f(.40, .39, .36), top * ss(.18, 0., abs(pd - 1.9)) * .8);
+      bump = mix(bump, mix(.3, .15, ss(-.3, .3, i.wp.y)), sandk);
     }
   } else if (mat == 2) {
     // whale fluke: smooth pale stone with dark streaks running along its length
@@ -345,6 +570,63 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
     alb *= .35 + .65 * ss(0., .12, min(pk, 1. - pk));
     alb = mix(alb, vec3f(.08, .22, .16), ss(.5, .7, A.c) * .6);
     gloss = .2; bump = .7;
+  } else if (mat == 6) {
+    // trees: bark, and foliage (marked by a negative ao)
+    let fol = step(i.ao, 0.); let ao6 = abs(i.ao);
+    var bark = mix(vec3f(.12, .08, .05), vec3f(.27, .21, .15), A.h) * (.6 + .8 * B.h) * (.55 + .45 * ss(.3, .5, sin(i.op.y * 11. + A.c * 3.)));
+    var lf = mix(vec3f(.045, .15, .04), vec3f(.20, .30, .07), fract(sd * 7.3)) * (.4 + 1. * B.h);
+    lf = mix(lf, lf * vec3f(1.7, 1.4, .6), ss(.7, 1., ao6) * .35);
+    alb = mix(bark, lf, fol); vao = .3 + .7 * ao6; bump = mix(.7, 1.2, fol); gloss = .12;
+  } else if (mat == 10) {
+    alb = partC(i.ao, sd); bump = .25; gloss = .15; flu = .4 * step(i.ao, .3);
+    if (i.ao > .9) { alb *= .75 + .5 * ss(.45, .55, abs(fract(i.op.x * 3.) - .5)) * step(.5, fract(sd * 5.1)); }
+  } else if (mat == 13) {
+    let lp = i.op - vec3f(sd * 37.); let wing = step(.25, i.ao) * step(i.ao, .45);
+    alb = vec3f(.9, .9, .87) * (.85 + .2 * B.h);
+    alb = mix(alb, vec3f(.42, .47, .52) * (.8 + .4 * B.h), wing * step(0., on.y));
+    alb = mix(alb, vec3f(.4, .45, .5), (1. - step(.15, i.ao)) * ss(.3, .8, on.y) * step(lp.x, .2) * .8);
+    alb = mix(alb, vec3f(.03, .03, .035), step(.45, i.ao) * step(i.ao, .6));
+    alb = mix(alb, vec3f(.9, .62, .08), step(.65, i.ao) * step(i.ao, .75)); alb = mix(alb, vec3f(.85, .4, .2), step(.8, i.ao) * step(i.ao, .9)); alb = mix(alb, vec3f(.02), step(.9, i.ao));
+    if (sd > 5.) {   // a pelican: dark brown body, a pale head and neck, a long grey bill and a pinkish pouch
+      var pc = vec3f(.2, .15, .1) * (.8 + .4 * B.h);
+      pc = mix(pc, vec3f(.36, .31, .25), wing * step(0., on.y)); pc = mix(pc, vec3f(.5, .45, .38), wing * step(on.y, 0.));
+      pc = mix(pc, vec3f(.93, .9, .74), step(.15, i.ao) * step(i.ao, .25) * (.8 + .3 * B.h));
+      pc = mix(pc, vec3f(.03), step(.45, i.ao) * step(i.ao, .6)); pc = mix(pc, vec3f(.62, .58, .5), step(.65, i.ao) * step(i.ao, .75));
+      pc = mix(pc, vec3f(.55, .34, .3), step(.75, i.ao) * step(i.ao, .8)); pc = mix(pc, vec3f(.05, .05, .05), step(.8, i.ao) * step(i.ao, .9)); pc = mix(pc, vec3f(.02), step(.9, i.ao));
+      alb = pc;
+    }
+    bump = .3; gloss = .3;
+  } else if (mat == 14) {
+    let lp = i.op - vec3f(sd * 37.); let zz = abs(lp.z) / .035;
+    let st = ss(.1, .2, zz) * ss(.7, .6, zz) * (.5 + .5 * step(zz, .4)) * ss(0., .4, on.y);
+    alb = mix(vec3f(.45, .27, .12), vec3f(.07, .04, .02), st * .9) * (.85 + .3 * B.h);
+    alb = mix(alb, vec3f(.78, .7, .58), ss(-.2, -.7, on.y) * .8);
+    alb = mix(alb, vec3f(.02), step(.9, i.ao)); alb = mix(alb, vec3f(.25, .1, .08), step(.65, i.ao) * step(i.ao, .75));
+    bump = .3; gloss = .2;
+  } else if (mat == 11) {
+    let tone = .3 + .7 * fract(sd * 9.1);
+    alb = mix(vec3f(.20, .12, .06), vec3f(.52, .36, .19), tone) * (.85 + .3 * B.h);
+    alb = mix(alb, alb * vec3f(1.2, 1.15, 1.05) + vec3f(.03, .02, .01), ss(.1, -.7, on.y) * .5);
+    alb = mix(alb, vec3f(.045, .045, .05), step(.6, i.ao) * step(i.ao, .7));
+    alb = mix(alb, vec3f(.015, .01, .008), step(.7, i.ao) * step(i.ao, .85)); alb = mix(alb, vec3f(.78, .74, .66), step(.9, i.ao));
+    if (sd > 5.) {   // a seal: grey, spotted, flippers and fur alike
+      let spots = ss(.6, .68, B.c * .5 + C.c * .5 + (fract(sd * 3.1) - .5) * .1);
+      var sl = mix(vec3f(.36, .38, .4), vec3f(.62, .64, .63), fract(sd * 3.1)) * (.85 + .3 * B.h);
+      sl = mix(sl, vec3f(.08, .09, .1), spots * .6); sl = mix(sl, sl * 1.25, ss(.1, -.7, on.y) * .5);
+      alb = mix(sl, alb, step(.7, i.ao) * step(i.ao, .85)); alb = mix(alb, vec3f(.78, .74, .66), step(.9, i.ao));
+    }
+    bump = .5; gloss = mix(.3, .55, ss(.5, -.3, i.wp.y));
+  } else if (mat == 12) {
+    let panel = step(.5, fract(atan2(i.op.z, i.op.x) * 4. / 3.14159));
+    alb = mix(select(vec3f(.9, .9, .85), vec3f(.85, .08, .08), fract(sd * 3.7) < .5), select(vec3f(.9, .75, .1), vec3f(.1, .3, .75), fract(sd * 3.7) < .5), panel);
+    alb = select(alb, vec3f(.7), i.ao < .2); bump = .1; gloss = .1;
+  } else if (mat == 8) {
+    alb = vec3f(.015, .02, .03); bump = .05; gloss = 1.; flu = 0.;
+  } else if (mat == 9) {
+    let gr = sin(i.op.x * 38. + sin(i.op.z * 3.) * .6 + A.c * 2.) * .5 + .5;
+    alb = mix(vec3f(.30, .16, .06), vec3f(.52, .30, .13), gr) * (.7 + .5 * B.h); bump = .35; gloss = .2;
+  } else if (mat == 7) {
+    alb = vec3f(.50, .49, .45) * (.75 + .4 * B.h) * (.8 + .3 * C.h); bump = .3; gloss = .08;
   } else if (mat == 4) {
     let hue = fract(sd * 7.31);
     alb = mix(vec3f(.60, .17, .08), vec3f(.64, .35, .10), fract(hue * 3.));
@@ -360,11 +642,11 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
     alb = mix(alb, vec3f(1., .75, .6), ss(.8, 1., i.ao) * .35);
     emi = alb * .01; flu = .75; gloss = .25; bump = 1.5;
   }
-  let rip = select(0., flt * gm.a * cos((i.wp.x * .8 + i.wp.z * .35) * 5. + A.c * 9.) * .65, mat == 0);
+  let rip = select(0., flt * min(gm.a + gm.g, 1.) * cos((i.wp.x * .8 + i.wp.z * .35) * 5. + A.c * 9.) * .65, mat == 0);
   let N = normalize(qrot(i.q, normalize(on + (A.n * .85 + B.n * .65 + C.n * .45 * ss(60., 12., dist) + F.n * .5 * fk) * bump + vec3f(.8, sgro, .35) * vec3f(rip, 1., rip))));
   let L = g.sun.xyz; let V = normalize(g.cam.xyz - i.wp);
   let v1 = vol(i.wp + n0 * 1.5); let v2 = vol(i.wp + n0 * 4.5);
-  let ao = (sat((v1.r - .5) * 8.) * .55 + sat((v2.r - .5) * 2.7) * .45) * vao * ss(.12, .6, hgt);
+  let ao = (sat((v1.r - .5) * 8.) * .55 + sat((v2.r - .5) * 2.7) * .45) * vao * mix(ss(.12, .6, hgt), 1., sandk);
   let z = zone(i.wp);
   let E = sunE(i.wp.y, z) * shadow9(i.wp + n0 * .35);
   let ndl = sat(dot(N, L));
@@ -416,6 +698,7 @@ fn pal(h: f32) -> vec3f {
     case 3 { col = mix(vec3f(.02, .05, .065), vec3f(.05, .03, .08), s1); col = mix(col, vec3f(.09, .03, .09), step(.8, s2)); pr = vec4f(.2, .85, .55, .02); spc = mix(vec3f(.5, .35, 1.), vec3f(.2, 1., .7), step(.6, hsel)); shp = vec2f(.7, .6); wav = 2.4; }
     case 4 { col = mix(vec3f(.30, .15, .02), vec3f(.42, .25, .04), s1); pr = vec4f(.2, 1., .1, 0.); spc = vec3f(1., .85, .5); shp = vec2f(.5, .4); wav = 1.8; }
     case 5 { col = mix(vec3f(.85, .05, .40), vec3f(.60, .10, .80), step(.7, s1)); col = mix(col, vec3f(.95, .25, .55), step(.75, s2)); pr = vec4f(.22, .8, 0., .30); spc = vec3f(1., .35, .8); shp = vec2f(.6, .6); fls = 2.; }
+    case 8 { col = mix(vec3f(.03, .30, .03), vec3f(.14, .52, .06), s1); pr = vec4f(0., .9, .15, 0.); shp = vec2f(.45, .3); wav = 2.4; fls = .6; }
     case 6 { col = mix(vec3f(.80, .16, .16), vec3f(.92, .36, .42), s1); pr = vec4f(.06, 1., 0., .10); spc = vec3f(1., .5, .5); shp = vec2f(.4, .3); wav = 2.; }
     default { col = mix(vec3f(.05, .40, .36), vec3f(.10, .52, .58), s1); pr = vec4f(.1, .9, .2, .04); spc = vec3f(.3, 1., .9); shp = vec2f(.6, .5); }
   }
@@ -500,7 +783,7 @@ struct GO { @builtin(position) cp: vec4f, @location(0) uv: vec2f, @location(1) @
 // ---------------------------------------------------------------- fish + mantas
 const W_ANIM = S_B + /*wgsl*/`
 struct VI { @location(0) p: vec3f, @location(1) n: vec4f, @location(2) a: vec4f, @location(3) b: vec4f };
-struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n: vec3f, @location(2) op: vec3f, @location(3) @interpolate(flat) sd: f32, @location(4) lt: f32 };
+struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n: vec3f, @location(2) op: vec3f, @location(3) @interpolate(flat) sd: f32, @location(4) lt: f32, @location(5) ao: f32 };
 @vertex fn vsFish(i: VI) -> VO {
   var o: VO;
   let s = i.b.x; let h = vec3f(hs(s), hs(s + .37), hs(s + .71));
@@ -513,7 +796,8 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
   let off = S * ((h.y - .5) * 5. + sin(t * .6 + s * 40.) * .5) + Up * ((h.z - .5) * 3.2 + cos(t * .5 + s * 31.) * .4);
   var l = i.p * i.b.z * (.75 + .5 * h.z);
   l.z += sin(t * 9. + s * 50. + l.x * 5.) * .22 * (.25 * i.b.z - l.x);
-  let w = P + off + T * l.x + Up * l.y + S * l.z;
+  var w = P + off + T * l.x + Up * l.y + S * l.z;
+  w.y = min(w.y, -.7 - .3 * sin(t * 1.3 + s * 9.));   // fish never leave the water
   o.cp = g.vp * vec4f(w, 1.); o.wp = w; o.n = T * i.n.x + Up * i.n.y + S * i.n.z; o.op = i.p; o.sd = s;
   o.lt = shadow1(w);
   return o;
@@ -523,6 +807,7 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
   let z = zone(i.wp); let vv = vol(i.wp);
   var alb = mix(vec3f(.50, .68, .80), vec3f(.10, .22, .40), ss(-.05, .2, i.op.y));
   alb = mix(alb, vec3f(.95, .8, .3), step(.86, fract(i.sd * 7.7)) * .6);
+  if (i.sd > 5.) { alb = mix(vec3f(.78, .17, .01), vec3f(.8, .3, .04), ss(.1, -.2, i.op.y)); alb = mix(alb, vec3f(.05, .02, .01), ss(.24, .3, i.op.x) * ss(.04, .0, abs(i.op.y - .03) - .03)); }
   let E = sunE(i.wp.y, z) * i.lt;
   var c = alb * (E * (.25 + .75 * sat(dot(n, L))) + amb(i.wp, n, vv.g, z) * 1.3);
   c += E * pow(sat(dot(n, normalize(V + L))), 24.) * 1.6 + vec3f(.3, .6, .7) * pow(1. - sat(dot(n, V)), 3.) * .25 * vv.g;
@@ -592,6 +877,26 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f };
   let v = i.wp - g.cam.xyz; let d = length(v); let V = v / d;
   let fl = ss(260., 60., d);
   let s = (textureSample(tW, sR, i.wp.xz / 13.).ba + textureSample(tW, sR, i.wp.zx / 4.7 + .2).ba * .7 + textureSample(tW, sR, i.wp.xz / 37. + .6).ba * .8) * fl;
+  if (g.cam.y > 0.) {
+    // from above: a see-through surface (the scene under it is already fogged) with sky reflection, shore foam, and an opaque body of water past the world's edge
+    let n = normalize(vec3f(-s.x * .3, 1., -s.y * .3));
+    let R = reflect(V, n); let cs = sat(dot(-V, n));
+    let F = .02 + .98 * pow(1. - cs, 5.);
+    let z = zone(i.wp);
+    let ao = max(ss(150., 235., d), ss(188., 205., length(i.wp.xz)));
+    let body = fogIn(vec3f(i.wp.x, 0., i.wp.z), normalize(vec3f(V.x * .7, -.8, V.z * .7)), 120., z, g.sun.xyz) * vec3f(.42, .62, 1.05);
+    let bo = 130. + 14. * (1. - min(i.wp.z * i.wp.z / 1600., 1.)) - i.wp.x;
+    let wd = select(99., -(min(-.1 * bo - 41. * ss(8., 78., bo), 2.8)), i.wp.x > 90. && abs(i.wp.z) < 66.);
+    let pat = textureSample(tW, sR, i.wp.xz / 2.1 + g.cam.w * .01).r;
+    let sw = .3 * (.5 + .5 * sin(g.cam.w * .7 + pat * 4.));
+    let foam = max(sat((.45 + sw - wd) / .45 + (pat - .5) * 1.1 - .15) * ss(-.2, .1, wd), .5 * ss(.2, .0, abs(wd - 2.6 - 2. * sw) - .12) * pat * pat) * ss(260., 120., d) * .9;
+    let tq = ss(.2, 1.4, wd) * ss(18., 5., wd);
+    var rgb = skyAt(vec3f(R.x, abs(R.y), R.z)) * F + body * ao * (1. - F);
+    var a = F + (1. - F) * ao;
+    rgb += vec3f(.04, .5, .42) * tq * (1. - F) * .55; a += (1. - a) * tq * .25;
+    rgb = mix(rgb, vec3f(2.4, 2.5, 2.4), foam); a = max(a, foam);
+    return vec4f(min(rgb, vec3f(40.)), a);
+  }
   let n = normalize(vec3f(-s.x * .8, -1., -s.y * .8));
   let ci = sat(dot(V, -n));
   let k = 1. - 1.769 * (1. - ci * ci);
@@ -615,7 +920,9 @@ struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f };
   return o;
 }
 @fragment fn fsB(i: VO) -> @location(0) vec4f {
-  let p = g.cam.xyz + normalize(i.wp - g.cam.xyz) * 240.;
+  let rd = normalize(i.wp - g.cam.xyz);
+  if (g.cam.y > 0.) { return fin(skyAt(vec3f(rd.x, abs(rd.y), rd.z))); }
+  let p = g.cam.xyz + rd * 240.;
   return fin(fog(vec3f(0.), p, zone(p)));
 }
 `;
@@ -699,6 +1006,7 @@ const W_RAYS = S_G + W_FS + /*wgsl*/`
   let rv = g.fwd.xyz + g.right.xyz * (nd.x * g.right.w) + g.up.xyz * (nd.y * g.up.w);
   let rl = length(rv); let rd = rv / rl;
   let zl = g.fwd.w / max(dp, 1e-6);
+  if (g.cam.y > 0.) { return vec4f(0., 0., 0., zl); }
   var tm = min(zl * rl, 120.);
   if (rd.y > 1e-4) { tm = min(tm, -g.cam.y / rd.y); }
   let ro = g.cam.xyz; let sx = g.sun.xyz; let k = kd(g.sun.w); let sgz = sg(g.sun.w);
@@ -712,7 +1020,7 @@ const W_RAYS = S_G + W_FS + /*wgsl*/`
     let vis = textureSampleCompareLevel(tSh, sS, vec2f(s.x * .5 + .5, .5 - s.y * .5), s.z - .0006);
     let q = p.xz - sx.xz * (p.y / sx.y);
     let pat = ss(.3, .7, textureSampleLevel(tW, sR, q / 27., 2.5).r) * ss(.15, .6, textureSampleLevel(tW, sR, q.yx / 11. + .3, 2.).r);
-    let o = textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.).r;
+    let o = textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., ${NY * VS}, 384.), 0.).r;
     let mist = sat(1. - (o - .5) * 3.4);
     acc += exp(-sgz * t + k * (p.y / sx.y)) * (vis * (.012 + pat * 6.) * (1. + 1.2 * mist * mist));
   }

@@ -3,7 +3,7 @@
 // ============================================================================
 // A fixed Web Audio graph, built on the first click / key / touch and driven by a 10 Hz timer, not the frame loop.
 // Layers: rumble, surface wash, water rush (follows camera speed), drone, bubbles, chimes and distant whale calls.
-let AC, OUT, muted = false;
+let AC, OUT, BARK = null, WHISTLE = null, muted = false; // BARK(pan, volume): a sea lion's bark, once the sound is running
 const VOL = 0.78; // master level: about -18.5 LUFS, peaks near -5.5 dBFS
 function mkSound(ac) {
   const sr = ac.sampleRate;
@@ -38,6 +38,37 @@ function mkSound(ac) {
     v.p.pan.setValueAtTime(rr(-0.7, 0.7), t);
     f.setValueAtTime(f0, t); f.exponentialRampToValueAtTime(f1, t + dur);
     g.setValueAtTime(0, t); g.linearRampToValueAtTime(vol, t + att); g.setTargetAtTime(0, t + att, (dur - att) / 5);
+  };
+  // a sea lion: one to four sawtooth barks with a falling pitch through a throaty formant
+  BARK = (pan, vol, agg = 0) => {
+    if (agg === 4) { // a gull: a high, harsh, falling call, twice
+      for (let k = 0, t = ac.currentTime + 0.03; k < 2; k++, t += rr(0.3, 0.45)) {
+        const o = new OscillatorNode(ac, { type: 'sawtooth' }), f = new BiquadFilterNode(ac, { type: 'bandpass', frequency: 2300, Q: 3 }), g = new GainNode(ac, { gain: 0 }), p = new StereoPannerNode(ac, { pan });
+        o.connect(f); f.connect(g); g.connect(p); p.connect(out); p.connect(wet);
+        o.frequency.setValueAtTime(rr(1500, 1800), t); o.frequency.exponentialRampToValueAtTime(rr(900, 1200), t + 0.3);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.03); g.gain.setTargetAtTime(0, t + 0.12, 0.08);
+        o.start(t); o.stop(t + 0.6);
+      }
+      return;
+    }
+    const t0 = ac.currentTime + 0.03, lo = agg === 3 ? 1.9 : agg ? 0.6 : 1, hv = agg === 3 ? 0.5 : agg ? 1.4 : 1;   // agg 3: a pup's high squeaky call
+    for (let n = agg === 3 ? 2 + (rnd() * 2 | 0) : agg ? 1 + (rnd() * 2 | 0) : 1 + (rnd() * 4 | 0), k = 0; k < n; k++) {
+      const t = t0 + k * rr(0.22, 0.36);
+      const o = new OscillatorNode(ac, { type: 'sawtooth' }), f = new BiquadFilterNode(ac, { type: 'bandpass', frequency: rr(600, 900) * lo, Q: 1.4 }), g = new GainNode(ac, { gain: 0 }), p = new StereoPannerNode(ac, { pan });
+      o.connect(f); f.connect(g); g.connect(p); p.connect(out); p.connect(wet);
+      o.frequency.setValueAtTime(rr(330, 430) * lo, t); o.frequency.exponentialRampToValueAtTime(rr(160, 230) * lo, t + 0.22 + agg * 0.1);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * hv, t + 0.015); g.gain.setTargetAtTime(0, t + 0.05, agg === 3 ? 0.05 : 0.07 + agg * 0.04);
+      o.start(t); o.stop(t + 0.6);
+    }
+  };
+  // the lifeguard's whistle: two sharp blasts
+  WHISTLE = (pan, vol) => {
+    for (let k = 0, t = ac.currentTime + 0.03; k < 2; k++, t += 0.45) {
+      const o = new OscillatorNode(ac, { type: 'sine' }), v = new OscillatorNode(ac, { frequency: 38 }), vg = new GainNode(ac, { gain: 90 }), g = new GainNode(ac, { gain: 0 }), p = new StereoPannerNode(ac, { pan });
+      v.connect(vg); vg.connect(o.frequency); o.connect(g); g.connect(p); p.connect(out); p.connect(wet);
+      o.frequency.setValueAtTime(2900, t); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.02); g.gain.setValueAtTime(vol, t + 0.26); g.gain.linearRampToValueAtTime(0, t + 0.32);
+      o.start(t); v.start(t); o.stop(t + 0.4); v.stop(t + 0.4);
+    }
   };
   const NOTES = [0, 2, 5, 7, 9, 12, 14, 17, 19]; // D major pentatonic, in semitones above A4
   let lt = ac.currentTime, tB = lt + 1.5, tC = lt + 5, tW = lt + 12, lx = F[CX], ly = F[CY], lz = F[CZ];
