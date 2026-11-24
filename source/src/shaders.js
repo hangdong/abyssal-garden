@@ -301,6 +301,13 @@ fn partC(ao: f32, sd: f32) -> vec3f {
   if (ao > .97) { return vec3f(.92, .95, .95); }
   return mix(vec3f(.9, .35, .05), vec3f(.1, .5, .8), step(.5, b)) * (.7 + .3 * c);
 }
+// value noise for the clouds, computed in the shader (no texture, so it looks the same on every device)
+fn ch(p: vec2f) -> f32 { let q = fract(p * vec2f(.1031, .1030)); let r = q + dot(q, q.yx + 33.33); return fract((r.x + r.y) * r.x); }
+fn cn(p: vec2f) -> f32 {
+  let i = floor(p); let f = fract(p); let u = f * f * (3. - 2. * f);
+  return mix(mix(ch(i), ch(i + vec2f(1., 0.)), u.x), mix(ch(i + vec2f(0., 1.)), ch(i + vec2f(1., 1.)), u.x), u.y);
+}
+fn cloudN(p: vec2f) -> f32 { return cn(p * 1.7) * .5 + cn(p * 3.6 + 7.) * .3 + cn(p * 7.9 + 19.) * .2; }
 // the sky seen from above the water
 fn skyAt(rd: vec3f) -> vec3f {
   let h = sat(rd.y);
@@ -308,7 +315,7 @@ fn skyAt(rd: vec3f) -> vec3f {
   let mu = max(dot(rd, g.sun.xyz), 0.);
   if (rd.y > .02) {   // drifting clouds: two octaves of the rock mottling texture, projected on a flat layer; thick cores are greyer
     let uv = rd.xz / (rd.y + .12) * .55 + vec2f(g.cam.w * .004, g.cam.w * .0015);
-    let n = textureSampleLevel(tD, sR, uv, 0.).a * .6 + textureSampleLevel(tD, sR, uv * 2.7 + 3.1, 0.).a * .4;
+    let n = cloudN(uv) * .62 + cloudN(uv * 2.7 + 3.1) * .38;
     let cl = ss(.5, .72, n) * ss(.02, .22, rd.y);
     c = mix(c, vec3f(2.7, 2.7, 2.6) - vec3f(.8, .7, .5) * ss(.55, .9, n), cl * .85);
   }
