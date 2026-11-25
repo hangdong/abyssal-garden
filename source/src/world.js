@@ -421,6 +421,10 @@ function makeWorld(D, T, flyPts, POSES) {
   for (const q of [[72, -22], [66, 14], [84, 38]]) actors.push({ k: 'K', x: q[0], z: q[1], yaw: rnd() * TAU, sc: 1, seed: rnd() });
   for (const q of [[60, -8], [78, -36]]) actors.push({ k: 'U', x: q[0], z: q[1], yaw: rnd() * TAU, sc: 1, seed: rnd() });
   for (const q of [[82, -60], [80, -52], [86, -68]]) actors.push({ k: 'R', x: q[0], z: q[1], yaw: rnd() * TAU, sc: 1, seed: rnd(), st: rnd() < 0.5 ? 0 : 1 });
+  // three leopard sharks cruising in circles in front of viewpoint 5 (key 5)
+  { const c = rel(4, 13, 0); for (const [r, d, a0, sd, lift] of [[5, 1, 0, 13.2, 3], [8.5, -1, 2.1, 13.5, 5], [12, 1, 4.2, 13.8, 7]]) actors.push({ k: 'H', x: c[0], z: c[1], yaw: 0, sc: 1.25, seed: sd, cx: c[0], cz: c[1], r, dir: d, a0, lift }); }
+  // rockfish hovering over the bottom below viewpoint 7 (key 7)
+  for (const [x, z, sd] of [[127, 10, 0.12], [126, 19, 0.37], [129, 23, 0.58], [125, 4, 0.81], [128, 15, 0.23], [130, 8, 0.66]]) actors.push({ k: 'Y', x, z, yaw: sd * 6, sc: 2.2, seed: sd });
   // visitors who now and then wander over to the sea lions, until someone tells them to keep away
   for (const q of [[152, 0, 0], [154, 2, 0], [150, 3, 0], [155, -2, 1]]) actors.push({ k: 'V', pose: 0, x: q[0], z: q[1], yaw: seaA, sc: q[2] ? KID * 1.15 : ad(), seed: rnd() });
   // pelicans: two on the cliff, one on a sea stack, two afloat and one in the air, all of them fishing now and then (seed >= 5 marks a pelican)
@@ -518,6 +522,8 @@ function makeWorld(D, T, flyPts, POSES) {
   rseed(14);
   const SCH = [[-2, -36, -10, 15, 520, 0.3, 1, 0.945], [8, -30, -70, 22, 420, 0.32, -1], [48, -30, 14, 18, 360, 0.3, 1], [-58, -30, -8, 11, 420, 0.28, -1, 0.3], [8, -36, 84, 16, 320, 0.28, 1],
     [-90, -28, -70, 25, 300, 0.3, 1], [95, -30, 70, 25, 300, 0.3, -1], [0, -22, 20, 30, 380, 0.34, -1], [-30, -30, -100, 18, 300, 0.3, 1], [16, -36, 30, 12, 300, 0.3, 1], [-48, -34, -58, 12, 300, 0.3, -1], [-45, -35, 38, 14, 320, 0.3, 1]];
+  // a school in view of viewpoint 2 (key 2), shallow enough to be seen from the surface
+  { const q = rel(1, 15, 0), g = groundOf(q[0], q[1]); SCH.push([q[0], g === null ? POSES[1][4] : g + 4.5, q[1], 7, 450, 0.3, 1, 0.62]); }
   for (const s of SCH) { const ss = s[7] === undefined ? rnd() : s[7]; for (let i = 0; i < s[4]; i++) fish.push(s[0], s[1], s[2], s[3], rnd(), s[6] * 1.9 / s[3], s[5], ss); }
   const mantas = [];
   for (const m of [[1, -28, 3.5, 14, 3.012, 0.085, 3.6, 0.1], [49, -31, 24.5, 5, 0.029, -0.08, 3.7, 0.4], [0, -14, -80, 34, 0.3, 0.06, 5.2, 0.7], [-50, -18, 20, 26, 5, -0.075, 3.8, 0.55], [10, -16, 86, 26, 2.2, 0.07, 4.4, 0.85], [20, -11, -20, 46, 4.2, -0.045, 5.6, 0.25]]) mantas.push(...m);
@@ -1013,24 +1019,34 @@ function etube(m, pts, ry, rz, aux, sides = 14, f = 3) {
   for (let k = 0; k < rg.length - 1; k++) for (let s = 0; s < sides; s++) { const s2 = (s + 1) % sides; m.quad(rg[k][s], rg[k][s2], rg[k + 1][s2], rg[k + 1][s]); }
   for (const [ring, p] of [[rg[0], R[0]], [rg[rg.length - 1], R[R.length - 1]]]) { const c = m.v(p[0], p[1], p[2], aux); for (let s = 0; s < sides; s++) m.tri(ring[s], ring[(s + 1) % sides], c); }
 }
-// California sea lion (NOAA diagram): big, with a long muscular neck, external ear flaps, large elongated fore flippers, rear flippers that point back.
-// +x forward. swim: streamlined with flippers swept back; otherwise a body propped up on the fore flippers (the shader lowers it to rest)
+// California sea lion, remade soft and chubby (after the reference picture): a deep rounded body, a thick neck, a head that flows out of the neck into a short broad muzzle,
+// large dark eyes with a glint, a small ear nub, long whiskers, big rounded flippers. +x forward. swim: streamlined with the flippers swept back;
+// otherwise a body propped up on the fore flippers (the shader lowers it to rest). aux: .5 fur, .65 flippers and ears, .78 eyes and nose, .93 whiskers and glints
 function meshSeaLion(swim) {
-  const m = new Mesh(), F = 0.5, D = AUX.hair, FL = 0.65;
-  const px = swim ? [-0.98, -0.8, -0.45, -0.05, 0.3, 0.55, 0.75, 0.88, 0.98, 1.07, 1.15, 1.21, 1.26] : [-0.98, -0.8, -0.45, -0.05, 0.28, 0.46, 0.58, 0.68, 0.77, 0.86, 0.95, 1.03, 1.09];
-  const py = swim ? [0, 0.01, 0.03, 0.04, 0.04, 0.05, 0.06, 0.07, 0.08, 0.07, 0.06, 0.05, 0.04] : [0.07, 0.1, 0.17, 0.3, 0.46, 0.66, 0.86, 1.03, 1.15, 1.22, 1.25, 1.25, 1.23];
-  // chubby: a deep round body, a thick neck, a broad rounded head with a short, blunt muzzle
-  const ry = swim ? [0.08, 0.16, 0.25, 0.3, 0.32, 0.25, 0.19, 0.16, 0.15, 0.14, 0.115, 0.085, 0.06] : [0.09, 0.17, 0.26, 0.32, 0.34, 0.3, 0.24, 0.19, 0.165, 0.15, 0.13, 0.095, 0.06];
-  const rz = swim ? [0.09, 0.17, 0.26, 0.3, 0.32, 0.24, 0.18, 0.155, 0.145, 0.14, 0.115, 0.09, 0.065] : [0.1, 0.18, 0.27, 0.33, 0.35, 0.3, 0.23, 0.18, 0.155, 0.15, 0.13, 0.1, 0.065];
-  etube(m, px.map((x, k) => [x, py[k], 0]), ry.map((r) => r * 0.93), rz.map((r) => r * 0.93), F, 32, 6);
-  ball(m, [px[12] + 0.012, py[12] - 0.004, 0], 0.04, D, 0.85, 3);                                   // nose
+  const m = new Mesh(), F = 0.5, D = AUX.hair, FL = 0.65, W = AUX.bright;
+  const px = swim ? [-0.98, -0.8, -0.45, -0.05, 0.3, 0.55, 0.75, 0.92, 1.0] : [-0.98, -0.8, -0.45, -0.05, 0.28, 0.5, 0.68, 0.82, 0.9];
+  const py = swim ? [0, 0.01, 0.03, 0.04, 0.04, 0.05, 0.07, 0.09, 0.1] : [0.07, 0.1, 0.17, 0.3, 0.46, 0.7, 0.95, 1.1, 1.17];
+  const ry = swim ? [0.07, 0.17, 0.27, 0.32, 0.33, 0.27, 0.22, 0.2, 0.19] : [0.07, 0.16, 0.27, 0.34, 0.36, 0.31, 0.26, 0.22, 0.19];
+  // the head is the same tube as the body: the neck swells a little into the skull, then narrows into the muzzle, so nothing stands out as a ball
+  const x0 = px[8], y0 = py[8], t = swim ? 0.3 : 1;
+  const hx = [0, 0.1, 0.22, 0.35, 0.44, 0.49], hy = [0, 0.03, 0.03, -0.02, -0.07, -0.09].map((d) => d * t), hr = [0.19, 0.225, 0.205, 0.15, 0.098, 0.056];
+  const X = px.concat(hx.slice(1).map((d) => x0 + d)), Y = py.concat(hy.slice(1).map((d) => y0 + d)), R = ry.concat(hr.slice(1));
+  etube(m, X.map((x, k) => [x, Y[k], 0]), R, R.map((r) => r * 1.05), F, 32, 5);
+  ball(m, [x0 + 0.5, y0 - 0.09 * t, 0], 0.042, D, 0.75, 3);                                           // the nose
   for (const s of [-1, 1]) {
-    ball(m, [px[10] - 0.03, py[10] + 0.035, 0.1 * s], 0.025, D, 1, 3);                              // eyes
-    blade(m, [[px[9] + 0.0, py[9] + 0.05, 0.12 * s], [px[9] - 0.04, py[9] + 0.08, 0.14 * s], [px[9] - 0.08, py[9] + 0.105, 0.155 * s]], [0.036, 0.03, 0.01], 0.012, FL, 2);   // external ear flaps
-    ball(m, [px[11] + 0.01, py[11] - 0.015, 0.05 * s], 0.042, F, 1, 2);                             // whisker pads
-    for (let k = 0; k < 7; k++) limb(m, [[px[11] + 0.04, py[11] - 0.015 + (k % 3) * 0.012, 0.055 * s], [px[11] + 0.24, py[11] + (k - 3) * 0.028, (0.17 + 0.03 * (k % 3)) * s]], [0.004, 0.002], AUX.bright, 3, 1);
-    if (swim) { blade(m, [[0.45, -0.05, 0.28 * s], [0.32, -0.1, 0.56 * s], [0.2, -0.13, 0.76 * s]], [0.22, 0.3, 0.22], 0.03, FL, 5); blade(m, [[-0.95, 0, 0.06 * s], [-1.2, 0, 0.18 * s], [-1.42, 0, 0.32 * s]], [0.18, 0.28, 0.4], 0.03, FL, 5); }
-    else { blade(m, [[0.34, 0.42, 0.3 * s], [0.5, 0.24, 0.46 * s], [0.68, 0.07, 0.6 * s], [0.9, 0.02, 0.72 * s]], [0.2, 0.3, 0.32, 0.22], 0.04, FL, 5); blade(m, [[-0.62, 0.14, 0.26 * s], [-0.5, 0.06, 0.42 * s], [-0.3, 0.03, 0.56 * s]], [0.15, 0.26, 0.32], 0.035, FL, 5); }
+    ball(m, [x0 + 0.37, y0 - 0.075 * t - 0.02, 0.06 * s], 0.068, F, 0.82, 3);                          // puffy whisker pads
+    ball(m, [x0 + 0.22, y0 + 0.03 * t + 0.065, 0.2 * s], 0.04, D, 1, 3);                            // eyes
+    ball(m, [x0 + 0.235, y0 + 0.03 * t + 0.08, 0.196 * s], 0.01, W, 1, 2);                          // with a tiny glint
+    ball(m, [x0 + 0.06, y0 + 0.03 * t + 0.1, 0.19 * s], 0.03, F, 1.3, 2);                             // ear nubs
+    for (let j = 0; j < 5; j++) limb(m, [[x0 + 0.36, y0 - 0.085 * t + (j - 2) * 0.014, 0.085 * s], [x0 + 0.46, y0 - 0.085 * t + (j - 2) * 0.03, (0.13 + 0.02 * (j % 3)) * s], [x0 + 0.56, y0 - 0.08 * t + (j - 2) * 0.05, (0.19 + 0.03 * (j % 3)) * s]], [0.0042, 0.003, 0.0015], W, 4, 3);
+    if (swim) {
+      blade(m, [[0.45, -0.05, 0.28 * s], [0.34, -0.1, 0.52 * s], [0.22, -0.14, 0.72 * s], [0.14, -0.15, 0.8 * s]], [0.2, 0.28, 0.24, 0.08], 0.045, FL, 6);
+      // the hind flippers held together, trailing behind like a tail
+      blade(m, [[-0.92, 0, 0.04 * s], [-1.08, 0, 0.06 * s], [-1.24, 0, 0.075 * s], [-1.36, 0, 0.07 * s], [-1.42, 0, 0.06 * s]], [0.1, 0.15, 0.17, 0.11, 0.03], 0.04, FL, 6);
+    } else {
+      blade(m, [[0.34, 0.42, 0.3 * s], [0.5, 0.24, 0.46 * s], [0.68, 0.07, 0.6 * s], [0.9, 0.02, 0.72 * s], [1.0, 0.015, 0.76 * s]], [0.2, 0.3, 0.32, 0.26, 0.08], 0.05, FL, 6);
+      blade(m, [[-0.72, 0.13, 0.22 * s], [-0.9, 0.07, 0.34 * s], [-1.1, 0.035, 0.46 * s], [-1.26, 0.03, 0.5 * s]], [0.15, 0.25, 0.32, 0.09], 0.045, FL, 6);
+    }
   }
   return m;
 }
@@ -1092,6 +1108,18 @@ function meshStingray() {
   for (const s of [-1, 1]) { ball(m, [0.3, 0.07, 0.13 * s], 0.032, D, 1, 1); ball(m, [0.14, 0.07, 0.17 * s], 0.02, D, 0.8, 1); }
   limb(m, [[-0.35, 0, 0], [-0.8, -0.005, 0], [-1.2, 0, 0], [-1.5, 0.01, 0]], [0.06, 0.035, 0.02, 0.007], 0.65, 8, 3);
   limb(m, [[-0.85, 0.02, 0], [-1.0, 0.045, 0]], [0.012, 0.002], D, 4, 1);
+  return m;
+}
+// a rockfish, +x forward: a chunky body, a big head, a long spiny dorsal fin. aux .1 body and fins (the crab material gives it an orange-red-brown coat), .95 eyes
+function meshRockfish() {
+  const m = new Mesh();
+  etube(m, [-0.22, -0.15, -0.05, 0.06, 0.15, 0.22, 0.27].map((x) => [x, 0, 0]), [0.01, 0.035, 0.075, 0.09, 0.08, 0.055, 0.03], [0.008, 0.025, 0.05, 0.058, 0.05, 0.036, 0.02], 0.1, 16, 4);
+  blade(m, [[0.12, 0.08, 0], [0.0, 0.13, 0], [-0.12, 0.1, 0], [-0.2, 0.045, 0]], [0.04, 0.1, 0.1, 0.05], 0.006, 0.1, 3, [0, 0, 1]);
+  blade(m, [[-0.2, 0, 0], [-0.27, 0, 0], [-0.34, 0, 0]], [0.03, 0.08, 0.11], 0.005, 0.1, 3, [0, 0, 1]);
+  for (const s of [-1, 1]) {
+    ball(m, [0.2, 0.035, 0.032 * s], 0.012, 0.95, 1, 2);
+    blade(m, [[0.08, -0.03, 0.04 * s], [0.04, -0.06, 0.09 * s], [0.0, -0.08, 0.12 * s]], [0.04, 0.055, 0.02], 0.004, 0.1, 3);
+  }
   return m;
 }
 // a gull, +x forward, feet at y = 0; wings spread (the shader folds them on the ground and flaps them in flight)

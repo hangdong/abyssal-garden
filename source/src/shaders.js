@@ -531,7 +531,7 @@ fn animActor(i: VI) -> vec3f {
       p = mix(p, rotY(p, vec3f(.55, .7, 0.), lyaw * .8), ss(.55, .9, q0.x));
     } else {
       let seal = step(5., sd);
-      p.z += sin(ph + q0.x * 3.) * mix(.07, .035, seal) * (.7 - q0.x);
+      p.z += sin(ph + q0.x * 3.) * mix(.03, .035, seal) * (.7 - q0.x);   // a sea lion's thrust is its fore flippers: the body only flexes a little
       if (seal > .5) { p.z += sin(ph * 1.3 + q0.x * 2.) * .16 * ss(-.5, -1.2, q0.x); }   // a seal swims with its hind flippers
       else if (step(.1, q0.x) * step(q0.x, .55) * step(.12, abs(q0.z)) > 0.) { p = rotY(p, vec3f(.45, -.05, sign(q0.z) * .22), -sign(q0.z) * sin(ph * .9) * .55); }   // a sea lion rows with its fore flippers
       p = mix(p, rotY(p, vec3f(.6, .05, 0.), lyaw * .5), ss(.6, .95, q0.x));
@@ -686,7 +686,7 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
     bump = .3; gloss = .2;
   } else if (mat == 11) {
     let tone = .3 + .7 * fract(sd * 9.1);
-    alb = mix(vec3f(.20, .12, .06), vec3f(.52, .36, .19), tone) * (.85 + .3 * B.h);
+    alb = mix(vec3f(.20, .12, .06), vec3f(.52, .36, .19), tone) * (.94 + .12 * B.h);
     alb = mix(alb, alb * vec3f(1.2, 1.15, 1.05) + vec3f(.03, .02, .01), ss(.1, -.7, on.y) * .5);
     alb = mix(alb, vec3f(.045, .045, .05), step(.6, i.ao) * step(i.ao, .7));
     alb = mix(alb, vec3f(.015, .01, .008), step(.7, i.ao) * step(i.ao, .85)); alb = mix(alb, vec3f(.78, .74, .66), step(.9, i.ao));
@@ -713,7 +713,7 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
       dc = mix(dc, vec3f(.21, .25, .29), step(.6, i.ao) * step(i.ao, .7));
       alb = mix(dc, vec3f(.02), step(.7, i.ao) * step(i.ao, .85)); bump = .15; gloss = .7;
     } else {
-      bump = .5; gloss = mix(.3, .55, ss(.5, -.3, i.wp.y));
+      bump = .12; gloss = mix(.3, .55, ss(.5, -.3, i.wp.y));
     }
   } else if (mat == 12) {
     let panel = step(.5, fract(atan2(i.op.z, i.op.x) * 4. / 3.14159));

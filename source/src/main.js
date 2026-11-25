@@ -19,7 +19,6 @@ const fail = (m) => { throw new Error(m, { cause: 1 }); }; // cause marks a mess
 if (!navigator.gpu) fail('This scene needs WebGPU. Try a current Chrome or Edge.');
 const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
 if (!adapter) fail('No WebGPU adapter found.');
-$('w').hidden = !!navigator.userAgentData; // only Chromium-based browsers have it
 const hasTS = adapter.features.has('timestamp-query');
 const device = await adapter.requestDevice({ requiredFeatures: hasTS ? ['timestamp-query'] : [] });
 // GPU errors go on screen as well (phones have no console), under ?dbg=N or after any error
@@ -257,7 +256,8 @@ function aim() {
   F[CX] = P6[0]; F[CY] = P6[1]; F[CZ] = P6[2];
   F[YAW] = atan2(dx, -dz); F[PIT] = atan2(dy, sqrt(dx * dx + dz * dz));
 }
-const lookAt = (x, y, z, tx, ty, tz) => { walk = above = false; F[VX] = F[VY] = F[VZ] = 0; P6[0] = x; P6[1] = y; P6[2] = z; P6[3] = tx; P6[4] = ty; P6[5] = tz; aim(); };
+const lookAt = (x, y, z, tx, ty, tz) => { walk = false; above = y > 0 && y < 1;   // viewpoint 7 treads water, head out
+  F[VX] = F[VY] = F[VZ] = 0; P6[0] = x; P6[1] = y; P6[2] = z; P6[3] = tx; P6[4] = ty; P6[5] = tz; aim(); };
 // camera spline (Catmull-Rom over position + look-at) at parameter F[SPL]
 function flyRaw() {
   const s = F[SPL]; let i = floor(s) | 0; if (i > FLYN - 2) i = FLYN - 2;
@@ -285,6 +285,7 @@ for (const p of POSES) flyPts.push([p[0], -40, p[2]]);
 await say('Growing kelp…', 0.73, 2500);
 const Wd = makeWorld(D, T, flyPts, POSES);
 for (const p of POSES) p[1] += Wd.gy(p[0], p[2]);
+POSES[6][0] = 123; POSES[6][1] = 0.9; POSES[6][2] = 13; POSES[6][3] = 143; POSES[6][4] = 0.9; POSES[6][5] = 25;   // viewpoint 7: just above the water, looking across the cove at the sea lions
 D = Wd.gy = T.smp = null; // with gy goes the generator's working memory (about 200 MB)
 
 await say('Building set pieces…', 0.94, 1200);
@@ -302,8 +303,8 @@ meshes.push(meshPalm().build(), meshTree(1).build(), meshTree(2).build(), meshBu
   meshPerson(0).build(), meshPerson(1).build(), meshPerson(2).build(), meshPerson(3).build(), meshUmbrella().build(), meshSeaLion(false).build(), meshCaveFrame().build(), meshNest().build());
 const GAR = meshGaribaldi().build(), SNORK = meshPerson(4).build(), LIONSWIM = meshSeaLion(true).build(), SEAL = meshSeal().build(), GULL = meshGull().build(), CHIP = meshChipmunk().build();
 const BOARD = meshSurfboard().build(), SUPB = meshSUPBoard().build(), KAYAK = meshKayak().build(), PAD1 = meshPaddle(false).build(), PAD2 = meshPaddle(true).build(), FOAM = meshFoam().build(), PELICAN = meshPelican().build(), CRAB = meshCrab().build(), BLOB = meshBlob(1, 1).build(), BLOBL = meshBlob(1.9, 0.85).build(), CFISH = meshCaughtFish().build();
-const DROP = meshDrop().build(), SPLAT = meshSplat().build(), DOLPHIN = meshDolphin().build(), LSHARK = meshLeopardShark().build(), RAY = meshStingray().build();
-meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, BLOB, BLOBL, CFISH, DROP, SPLAT, DOLPHIN, LSHARK, RAY);
+const DROP = meshDrop().build(), SPLAT = meshSplat().build(), DOLPHIN = meshDolphin().build(), LSHARK = meshLeopardShark().build(), RAY = meshStingray().build(), ROCKFISH = meshRockfish().build();
+meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, BLOB, BLOBL, CFISH, DROP, SPLAT, DOLPHIN, LSHARK, RAY, ROCKFISH);
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
 const allV = new Uint8Array(nV * 16), allI = new Uint32Array(nI);
@@ -320,12 +321,12 @@ const drawDeco = (r) => { for (let k = 0; k < nDeco.length; k++) if (nDeco[k]) {
 // Every figure is an actor: a little state machine on the CPU (where it is, what it does, how it reacts to the camera) that
 // writes one instance per frame. The vertex shader poses it (walk cycle, digging, waving, head turn, breathing, swim stroke).
 // slots: 0-3 people (stand, sit, lie, crouch), 4 snorkeler, 5 sea lion on land, 6 sea lion swimming
-const SLM = [meshes[DECO0 + 11], meshes[DECO0 + 12], meshes[DECO0 + 13], meshes[DECO0 + 14], SNORK, meshes[DECO0 + 16], LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, CFISH, DROP, SPLAT, DOLPHIN, LSHARK, RAY];   // 22 the leopard shark, 23 the stingray;   // 21 the dolphin, 19 a dropping, 20 its splat, 18 the pelican's fish, 17 crab, 16 pelican, 10 surfboard, 11 paddle board, 12 kayak, 13 paddle, 14 kayak paddle, 15 spray
+const SLM = [meshes[DECO0 + 11], meshes[DECO0 + 12], meshes[DECO0 + 13], meshes[DECO0 + 14], SNORK, meshes[DECO0 + 16], LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, CFISH, DROP, SPLAT, DOLPHIN, LSHARK, RAY, ROCKFISH];   // 22 the leopard shark, 23 the stingray;   // 21 the dolphin, 19 a dropping, 20 its splat, 18 the pelican's fish, 17 crab, 16 pelican, 10 surfboard, 11 paddle board, 12 kayak, 13 paddle, 14 kayak paddle, 15 spray
 const NACT = Wd.actors.length, SLI = SLM.map(() => new Float32Array(NACT * 12)), SLN = new Uint32Array(SLM.length);
 const SLB = SLM.map(() => device.createBuffer({ size: NACT * 48, usage: BU.VERTEX | BU.COPY_DST }));
 const drawActors = (r) => { for (let s = 0; s < SLM.length; s++) if (SLN[s]) { r.setVertexBuffer(1, SLB[s]); r.drawIndexed(SLM[s].ib.length, SLN[s], SLM[s].i0, SLM[s].v0, 0); } };
 const ACT = Wd.actors.map((a) => ({ k: a.k, pose: a.pose || 0, hpose: a.pose || 0, x: a.x, z: a.z, y: 0, yaw: a.yaw, hx: a.x, hz: a.z, hyaw: a.yaw, sc: a.sc, seed: a.seed, ph: a.seed * 6, amt: 0, st: a.st !== undefined ? a.st : a.walk ? 4 : 0, tm: 0, high: a.high, lift: a.lift || 0, wx: a.x, wz: a.z, y0: a.y0, hy: 0, fish: 0, caught: 0, dig: 0, cl: 0, ft: 0, fx: 0, fz: 0, vc: 25 + a.seed * 70, vol: 0, vtm: 0, roll: 0, pk: 0, pk2: 0, fy: 10, dir: 1, sp: 0, mx: 0, mz: 1, cd: a.k === 'F' ? 0 : 4 + a.seed * 10, al: -1,
-  w: a.walk, wt: 0, hd: a.yaw, mood: 0, seen: 0, bc: 0, bk: 0, hit: 0, lg: 0, pup: a.k === 'L' && a.sc < 0.7, ab: 0, wq: 0, tx: a.x, tz: a.z, dv: a.seed * 20, ret: 0, away: 0, idle: 0, mv: 0, pitch: 0, home: a.k === 'L' }));
+  w: a.walk, wt: 0, hd: a.yaw, mood: 0, seen: 0, bc: 0, bk: 0, hit: 0, lg: 0, pup: a.k === 'L' && a.sc < 0.7, ab: 0, wq: 0, tx: a.x, tz: a.z, dv: a.seed * 20, ret: 0, away: 0, idle: 0, mv: 0, pitch: 0, home: a.k === 'L', ox: a.cx, oz: a.cz, orad: a.r, odir: a.dir, ang: a.a0 }));
 let ACTINIT = false; // the collision grid is read the first time the actors update
 const wlX = (z) => 130 + 14 * (1 - min(z * z / 1600, 1)); // x of the waterline at z (see the beach in W_DENS)
 const turnTo = (a, to, rate, dt) => { let d = to - a.yaw; d = atan2(sin(d), cos(d)); const m = rate * dt; a.yaw += d < -m ? -m : d > m ? m : d; };
@@ -503,9 +504,9 @@ function separate() {
   for (let it = 0; it < 2; it++) {
     for (let i = 0; i < NACT; i++) {
       const a = ACT[i], ra = actRad(a), land = a.k === 'P' || a.k === 'L' || a.k === 'V' || a.k === 'X';
-      if ((a.k === 'G' || a.k === 'Q') && a.st >= 2 && a.st !== 5) continue;
+      if ((a.k === 'G' || a.k === 'Q') && a.st >= 2 && a.st !== 5 || a.k === 'H' || a.k === 'Y') continue;
       for (let j = i + 1; j < NACT; j++) {
-        const b = ACT[j]; if ((b.k === 'G' || b.k === 'Q') && b.st >= 2 && b.st !== 5) continue;
+        const b = ACT[j]; if ((b.k === 'G' || b.k === 'Q') && b.st >= 2 && b.st !== 5 || b.k === 'H' || b.k === 'Y') continue;
         const dx = a.x - b.x, dz = a.z - b.z, m = ra + actRad(b);
         if (dx > m || dx < -m || dz > m || dz < -m || a.y - b.y > 1.4 || b.y - a.y > 1.4) continue;
         const d = hypot(dx, dz); if (d >= m) continue;
@@ -914,6 +915,25 @@ function emitPrey(dt) {
     emit(18, f.x, f.y, f.z, yaw + sin(t * 14 + f.seed * 30) * 0.18, f.air ? atan2(f.vy, f.sp) : 0, 0, f.seed, 0, 0, 1.6, 10);
   }
 }
+// rockfish hang over the bottom near their spot, drifting a little and turning slowly now and then
+function updRockfish(a, dt) {
+  a.tm -= dt; if (a.tm < 0) { a.wx = a.hx + rr(-2.5, 2.5); a.wz = a.hz + rr(-2.5, 2.5); a.tm = 3 + rnd() * 4; }
+  const dx = a.wx - a.x, dz = a.wz - a.z, d = hypot(dx, dz);
+  if (d > 0.3) { let da = atan2(dz, dx) - a.hd; da = atan2(sin(da), cos(da)); a.hd += clamp(da, -dt * 0.8, dt * 0.8); const sp = 0.25; a.x += cos(a.hd) * sp * dt; a.z += sin(a.hd) * sp * dt; }
+  a.yaw = atan2(-sin(a.hd), cos(a.hd));
+  const g = ground(a.x, 2, a.z); a.y += ((g > -1e8 ? g + 0.45 : -2) + 0.08 * sin(F[TIME] * 0.7 + a.seed * 9) - a.y) * min(1, dt * 1.5);
+}
+// leopard sharks that circle slowly near the sea floor in front of viewpoint 5
+function updShark(a, dt) {
+  const t = F[TIME], sp = 1.1 + (a.seed % 1) * 0.5; a.ang += a.odir * dt * sp / a.orad;
+  const r = a.orad * (1 + 0.05 * sin(t * 0.13 + a.seed * 9));
+  a.x = a.ox + cos(a.ang) * r; a.z = a.oz + sin(a.ang) * r;
+  a.hd = atan2(a.odir * cos(a.ang), -a.odir * sin(a.ang)); a.yaw = atan2(-sin(a.hd), cos(a.hd)); a.ph += dt * 3;
+  // the sea floor is sampled now and then and followed slowly, so the height never jumps; each shark keeps its own layer above it
+  a.gt = (a.gt || 0) - dt; if (a.gt < 0 || a.sg === undefined) { a.sg = seabed(a.x, a.z); a.gt = 0.6; if (a.sg < -1e8) a.sg = -12; if (a.fl === undefined) { a.fl = a.sg; a.y = a.sg + a.lift; } }
+  a.fl += (a.sg - a.fl) * min(1, dt * 0.35);
+  a.y += (a.fl + a.lift + 0.3 * sin(t * 0.25 + a.seed * 7) - a.y) * min(1, dt * 0.8);
+}
 // the sea floor under (x, z), searching down in steps (ground() only looks 9 m); -1e9 where there is none
 function seabed(x, z) { for (let y0 = -0.1; y0 > -42; y0 -= 9) { const g = ground0(x, y0, z); if (g > -1e8) return g; } return -1e9; }
 // leopard shark (8) and stingray (9): both live on the sea floor. The shark cruises low and scans (B) for creatures buried in the sand; the ray glides anywhere in the water and B buries it, eyes out, and anyone who comes close to it in the water is stung.
@@ -1268,7 +1288,7 @@ function updateActors(dt) {
     const a = ACT[i], k = a.k;
     if (k === 'V') updVisitor(a, dt, px, pz, py); else if (k === 'P') updPerson(a, dt, px, pz, py); else if (k === 'L') updLion(a, dt, px, pz, py); else if (k === 'E') updSeal(a, dt, px, pz, py);
     else if (k === 'G') updGull(a, dt, px, pz, py); else if (k === 'C') updChip(a, dt, px, pz, py); else if (k === 'F') updGuard(a, dt, px, pz, py);
-    else if (k === 'K' || k === 'U') updPaddler(a, dt); else if (k === 'R') updSurfer(a, dt); else if (k === 'Q') updPelican(a, dt, px, pz, py); else if (k === 'X') updCrab(a, dt, px, pz, py); else updSwimmer(a, dt, px, pz, py);
+    else if (k === 'K' || k === 'U') updPaddler(a, dt); else if (k === 'R') updSurfer(a, dt); else if (k === 'Q') updPelican(a, dt, px, pz, py); else if (k === 'X') updCrab(a, dt, px, pz, py); else if (k === 'H') updShark(a, dt); else if (k === 'Y') updRockfish(a, dt); else updSwimmer(a, dt, px, pz, py);
   }
   separate();
   for (let i = 0; i < NACT; i++) {
@@ -1276,6 +1296,8 @@ function updateActors(dt) {
     if (k === 'F' || k === 'K' || k === 'U' || k === 'R') { emitCraft(a); continue; }
     if (k === 'Q') { emitPelican(a); continue; }
     if (k === 'X') { emitCrab(a); continue; }
+    if (k === 'Y') { emit(24, a.x, a.y, a.z, a.yaw + sin(F[TIME] * 6 + a.seed * 30) * 0.08, 0, 0, a.seed, 0, 0, a.sc, 15); continue; }
+    if (k === 'H') { emit(22, a.x, a.y, a.z, a.yaw, 0, 0, a.seed, a.ph, 0.6, a.sc, 11); continue; }
     // swimmers just turned into land lions (or back) are drawn this frame in their new slot
     const slot = k === 'P' ? a.pose : k === 'V' ? 0 : k === 'N' ? 4 : k === 'L' ? 5 : k === 'S' ? 6 : k === 'E' ? 7 : k === 'G' ? 8 : 9, o = SLN[slot]++ * 12, f = SLI[slot];
     if (k === 'P' || k === 'V') { f[o + 4] = 0; f[o + 5] = sin(a.yaw * 0.5); f[o + 6] = 0; f[o + 7] = cos(a.yaw * 0.5); } else setQ(f, o, a.yaw, k === 'S' || k === 'E' || k === 'G' ? a.pitch : 0, k === 'G' ? a.roll : 0);
