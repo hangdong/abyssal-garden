@@ -489,7 +489,14 @@ fn animActor(i: VI) -> vec3f {
   } else {
     let mv = step(.5, r); let alert = (r - mv * .5) / .49;
     let lyaw = clamp(atan2(-lq.z, lq.x), -1., 1.) * near * ss(.2, .8, lq.x / max(length(lq.xz), .01));
-    if (sd > 11.) {     // a dolphin: the whole body undulates up and down, the flukes most; amt is how hard it swims, pose 1 is airborne
+    if (sd > 13.) {     // leopard shark (13.x) and stingray (15.x): the shark swims with a side-to-side wave, the ray flaps its wings and whips its tail
+      let da = r / .99;
+      if (sd < 15.) { p.z += sin(ph + q0.x * 2.8) * (.025 + .08 * da) * ss(.7, -1.0, q0.x); p.z += sin(ph + q0.x * 2.8) * .07 * da * ss(-.8, -1.35, q0.x); }
+      else {
+        p.y += sin(ph - abs(q0.z) * 4.) * (.03 + .09 * da) * ss(.1, .6, abs(q0.z));
+        p.z += sin(ph * 1.3 + q0.x * 3.) * (.03 + .05 * da) * ss(-.5, -1.4, q0.x);
+      }
+    } else if (sd > 11.) {     // a dolphin: the whole body undulates up and down, the flukes most; amt is how hard it swims, pose 1 is airborne
       let da = r / .99;
       p.y += sin(ph + q0.x * 2.4) * (.05 + .12 * da) * ss(.9, -1.3, q0.x);
       p.y += sin(ph + q0.x * 2.4) * .06 * da * ss(-1.2, -1.7, q0.x);
@@ -682,7 +689,18 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
       sl = mix(sl, vec3f(.08, .09, .1), spots * .6); sl = mix(sl, sl * 1.25, ss(.1, -.7, on.y) * .5);
       alb = mix(sl, alb, step(.7, i.ao) * step(i.ao, .85)); alb = mix(alb, vec3f(.78, .74, .66), step(.9, i.ao));
     }
-    if (sd > 11.) {   // a bottlenose dolphin: slate back, pale belly, darker fins and a dark eye
+    if (sd > 13.) {
+      let sp2 = ss(.6, .68, B.c * .5 + C.c * .5 + (fract(sd * 3.1) - .5) * .1); let back = ss(-.15, .35, on.y);
+      var kc = vec3f(.55, .5, .4) * (.85 + .3 * B.h);
+      if (sd < 15.) {   // a leopard shark: tan above with dark saddles and spots, white below
+        kc = mix(kc, vec3f(.11, .08, .06), sp2 * back * .85); kc = mix(kc, vec3f(.86, .84, .78), ss(.05, -.5, on.y));
+        kc = mix(kc, kc * .75, step(.6, i.ao) * step(i.ao, .7));
+      } else {          // a round stingray: sandy and mottled above, pale below, darker tail
+        kc = mix(vec3f(.5, .42, .3), vec3f(.36, .3, .22), sp2) * (.85 + .3 * B.h); kc = mix(kc, vec3f(.85, .8, .72), ss(.05, -.5, on.y));
+        kc = mix(kc, kc * .6, step(.6, i.ao) * step(i.ao, .7));
+      }
+      alb = mix(kc * .7, vec3f(.02), step(.7, i.ao) * step(i.ao, .85)); bump = .2; gloss = .12;
+    } else if (sd > 11.) {   // a bottlenose dolphin: slate back, pale belly, darker fins and a dark eye
       var dc = mix(vec3f(.27, .32, .37), vec3f(.4, .45, .5), ss(-.1, -.8, on.y)) * (.85 + .3 * B.h);
       dc = mix(dc, vec3f(.78, .8, .82), ss(.15, -.55, on.y) * step(i.ao, .6));
       dc = mix(dc, vec3f(.21, .25, .29), step(.6, i.ao) * step(i.ao, .7));

@@ -1068,6 +1068,32 @@ function meshDolphin() {
   }
   return m;
 }
+// a leopard shark, +x forward: slim body, a long upper tail lobe, two dorsal fins, broad pectorals (the shader paints the saddles and spots). aux .5 body, .65 fins, .78 eye
+function meshLeopardShark() {
+  const m = new Mesh(), F = 0.5, FN = 0.65, D = AUX.hair;
+  const px = [-0.85, -0.55, -0.1, 0.35, 0.7, 0.9, 1.0, 1.08], ry = [0.025, 0.065, 0.14, 0.17, 0.135, 0.09, 0.055, 0.03], rz = [0.03, 0.065, 0.135, 0.17, 0.135, 0.095, 0.06, 0.035];
+  etube(m, px.map((x, k) => [x, 0, 0]), ry, rz, F, 20, 4);
+  blade(m, [[-0.8, 0.02, 0], [-1.05, 0.2, 0], [-1.32, 0.44, 0]], [0.11, 0.12, 0.03], 0.025, FN, 3, [0, 0, 1]);
+  blade(m, [[-0.8, 0, 0], [-1.0, -0.1, 0], [-1.12, -0.18, 0]], [0.08, 0.07, 0.02], 0.02, FN, 2, [0, 0, 1]);
+  blade(m, [[0.25, 0.14, 0], [0.12, 0.28, 0], [0.0, 0.35, 0]], [0.22, 0.16, 0.03], 0.03, FN, 3, [0, 0, 1]);
+  blade(m, [[-0.38, 0.06, 0], [-0.46, 0.14, 0], [-0.52, 0.17, 0]], [0.12, 0.08, 0.02], 0.02, FN, 2, [0, 0, 1]);
+  for (const s of [-1, 1]) {
+    ball(m, [0.88, 0.04, 0.075 * s], 0.014, D, 1, 1);
+    blade(m, [[0.45, -0.08, 0.1 * s], [0.3, -0.2, 0.3 * s], [0.14, -0.26, 0.5 * s]], [0.18, 0.2, 0.06], 0.02, FN, 3);
+    blade(m, [[-0.3, -0.07, 0.06 * s], [-0.4, -0.13, 0.17 * s], [-0.5, -0.17, 0.26 * s]], [0.1, 0.1, 0.03], 0.015, FN, 2);
+  }
+  return m;
+}
+// a round stingray, +x forward, lying flat: a wide disc, eyes on top, a long thin tail with a spine. aux .5 body, .65 tail, .78 eyes and spine
+function meshStingray() {
+  const m = new Mesh(), F = 0.5, D = AUX.hair;
+  merge(m, icosphere(3, (x, y, z) => [x * 0.5, y * 0.07, z * 0.66]), 0, 0, 0, () => F);
+  ball(m, [0.46, 0.0, 0], 0.1, F, 0.5, 2);
+  for (const s of [-1, 1]) { ball(m, [0.3, 0.07, 0.13 * s], 0.032, D, 1, 1); ball(m, [0.14, 0.07, 0.17 * s], 0.02, D, 0.8, 1); }
+  limb(m, [[-0.35, 0, 0], [-0.8, -0.005, 0], [-1.2, 0, 0], [-1.5, 0.01, 0]], [0.06, 0.035, 0.02, 0.007], 0.65, 8, 3);
+  limb(m, [[-0.85, 0.02, 0], [-1.0, 0.045, 0]], [0.012, 0.002], D, 4, 1);
+  return m;
+}
 // a gull, +x forward, feet at y = 0; wings spread (the shader folds them on the ground and flaps them in flight)
 function meshGull() {
   const m = new Mesh(), W = 0.1, WG = 0.3, TIP = 0.5, BK = 0.7, FT = 0.85, EY = 0.95, H = 0.18;
