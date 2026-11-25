@@ -481,6 +481,7 @@ function updSwimmer(a, dt, px, pz, py) {
   else if (d < 8) { sp = 0; a.amt += (1 - a.amt) * min(1, dt * 3); }
   else { a.tm -= dt; if (a.tm < 0 || hypot(a.wx - a.x, a.wz - a.z) < 3) { a.wx = rr(102, 126); a.wz = rr(-44, 44); a.tm = 10 + rnd() * 10; } tx = a.wx; tz = a.wz; }
   if (!lion && d >= 8) a.amt += (0 - a.amt) * min(1, dt * 2);
+  if (!lion && a.ft > 0) { a.ft -= dt; tx = a.x + (a.x - a.fx) * 3; tz = a.z + (a.z - a.fz) * 3; sp = 2.4; a.amt = 1; }   // stung: swims away, head up
   let want = atan2(tz - a.z, tx - a.x);
   const g0 = ground(a.x, 2, a.z), ah = ground(a.x + cos(a.hd) * 3.5, 2, a.z + sin(a.hd) * 3.5);
   if (!a.ret && ah > -1.5) want = PI;                       // too shallow ahead: head out to sea
@@ -658,7 +659,8 @@ function updSurfer(a, dt) {
   else if (a.st === 1) { tx = sx; tz = sz; sp = 1.0; if (hypot(sx - a.x, sz - a.z) < 3) a.st = 2; }
   else if (a.st === 2) { tx = ex; tz = ez; sp = 5.5; a.roll = sin(F[TIME] * 2 + a.seed * 9) * 0.12; a.y = -0.02; if (hypot(ex - a.x, ez - a.z) < 3) a.st = 3; }
   else { sp = 1.0; if (hypot(a.hx - a.x, a.hz - a.z) < 3) { a.st = 0; a.tm = 6 + rnd() * 12; } }
-  if (sp > 0) steerWater(a, tx, tz, sp, a.st === 2 ? 2 : 1.2, dt);
+  if (a.ft > 0) { a.ft -= dt; steerWater(a, a.x + (a.x - a.fx) * 3, a.z + (a.z - a.fz) * 3, 2.6, 3, dt); sp = 2.6; }
+  else if (sp > 0) steerWater(a, tx, tz, sp, a.st === 2 ? 2 : 1.2, dt);
   a.ph += dt * (a.st === 1 || a.st === 3 ? 3.2 : 1); a.yaw = atan2(-sin(a.hd), cos(a.hd)); a.sp = sp;
 }
 // one instance into a slot
@@ -684,7 +686,7 @@ function emitCraft(a) {
 }
 // ---------------------------------------------------------------- roles: swim as yourself, or be a sea lion, a gull or the lifeguard
 // T changes role, V swaps between the chase camera and the animal's own eyes, B calls: a bark, a squawk, or the lifeguard's warning.
-const ROLES = ['Swimmer', 'Sea lion', 'Gull', 'Lifeguard', 'Pelican', 'Crab', 'Seal', 'Dolphin', 'Leopard shark', 'Stingray'], CALLS = ['', 'bark  ·  E charge and bite', 'squawk  ·  P drop a dropping', 'warn the visitors', 'plunge-dive for fish', 'pinch  ·  E dig in / out', 'grunt', 'leap out of the sea  ·  swim into fish to eat them', 'scan the sea floor for hidden prey  ·  swim into it to eat it', 'hide under the sand (or come out)  ·  anyone close by gets stung'];
+const ROLES = ['Swimmer', 'Sea lion', 'Gull', 'Lifeguard', 'Pelican', 'Crab', 'Seal', 'Dolphin', 'Leopard shark', 'Stingray', 'Kayaker'], CALLS = ['', 'bark  ·  E charge and bite', 'squawk  ·  P drop a dropping', 'warn the visitors', 'plunge-dive for fish', 'pinch  ·  E dig in / out', 'grunt', 'leap out of the sea  ·  swim into fish to eat them', 'scan the sea floor for hidden prey  ·  swim into it to eat it', 'hide under the sand (or come out)  ·  anyone close by gets stung  ·  E / Q rise and sink', 'paddle hard for a few seconds'];
 let ROLE = 0, TPV = true, swapped = false, score = 0, callCd = 0, callT = 0, fishCaught = 0, pinched = 0;
 const PL = new Float64Array(3), EY = new Float64Array(3), DV = new Float64Array(7);
 // avatar: mode 0 on the ground (sea lion on land, gull walking), 1 in the water (swimming, floating), 2 in the air (gull)
@@ -704,6 +706,7 @@ function setRole(r) {
   else if (r === 5) { AV.x = 147; AV.z = -10; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.dig = AV.digT = 0; AV.byaw = 0; AV.pinchT = 0; F[YAW] = -PI / 2; F[PIT] = -0.25; }
   else if (r === 7) { let x = 118; while (x > 60 && ground(x, 2, 0) > -3) x -= 4; AV.x = x; AV.z = 0; AV.y = -1.2; AV.hd = PI; AV.mode = 1; AV.out = false; AV.spin = 0; F[YAW] = -PI / 2; F[PIT] = -0.1; seedPrey(); }
   else if (r === 8 || r === 9) { let x = r === 8 ? 118 : 132; while (x > 60 && (r === 8 ? ground(x, 2, 0) > -3 : ground(x, 2, 0) > -1.5)) x -= r === 8 ? 4 : 1; AV.x = x; AV.z = 0; AV.hd = PI; AV.mode = 1; AV.dig = AV.digT = 0; AV.off = 0.2; const g = seabed(x, 0); AV.y = g > -1e8 ? g + 0.6 : -3; F[YAW] = -PI / 2; F[PIT] = -0.2; seedBPrey(); }
+  else if (r === 10) { let x = 126; while (x > 60 && ground(x, 2, 0) > -2) x -= 2; AV.x = x; AV.z = 0; AV.y = -0.05; AV.hd = PI; AV.mode = 1; AV.sp = 0; AV.ph = 0; AV.boost = 0; F[YAW] = -PI / 2; F[PIT] = -0.15; }
   else { const T = Wd.tower; if (T) { F[CX] = T[0] - 4.8; F[CZ] = T[2] + 0.5; F[CY] = ground(F[CX], T[1] + 4.2, F[CZ]) + 1.7; } else { F[CX] = 182.5; F[CZ] = -14; F[CY] = ground(182.5, 12, -14) + 1.7; } walk = true; TPV = false; F[YAW] = -PI / 2; F[PIT] = -0.15; }   // first person: a chase camera would end up inside the cabin
   if (r === 1) { BB.x = AV.x - 1.6; BB.z = AV.z + 0.6; BB.y = ground(BB.x, 4, BB.z); BB.mode = 0; BB.hd = PI; }
   roleHud();
@@ -750,7 +753,7 @@ function lionMove(dt, yaw, pitch, mf, mr, fast) {
 }
 function lookMove(dt, yaw, pitch) {
   const fast = ks || tN > 1, mf = tId >= 0 && !TOUCHUI ? 0.7 : kf - kb, mr = kr - kl;
-  if (ROLE === 1 || ROLE === 6) lionMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 7) dolphinMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 8 || ROLE === 9) finMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 5) crabMove(dt, yaw, mf, mr, fast); else gullMove(dt, yaw, pitch, mf, mr, fast);
+  if (ROLE === 1 || ROLE === 6) lionMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 7) dolphinMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 8 || ROLE === 9) finMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 10) kayakMove(dt, yaw, mf, fast); else if (ROLE === 5) crabMove(dt, yaw, mf, mr, fast); else gullMove(dt, yaw, pitch, mf, mr, fast);
 }
 function gullMove(dt, yaw, pitch, mf, mr, fast) {
   const A = AV, sy = sin(yaw), cw = cos(yaw), P = ROLE === 4;
@@ -921,14 +924,14 @@ function finMove(dt, yaw, pitch, mf, mr, fast) {
   if (ray) A.dig += clamp(A.digT - A.dig, -dt / 0.8, dt / 0.8);
   const bur = ray && A.dig > 0.5, sp = ray ? (fast ? 5 : 2.8) : (fast ? 9 : 4.5), k = 1 - exp(-dt * (ray ? 4 : 2.2)), m = bur ? 0 : 1;
   A.vx += ((sy * cp * mf + cw * mr) * sp * m - A.vx) * k; A.vz += ((-cw * cp * mf + sy * mr) * sp * m - A.vz) * k;
-  if (ray) { A.off = clamp(A.off + (ku - kd) * dt * 1.2, 0, 2.2); A.vy = 0; } else A.vy += ((sin(pitch) * mf + (ku - kd)) * sp - A.vy) * k;
+  if (ray) { /* E rises, all the way to the surface under the swimmers */ A.off = clamp(A.off + (ku - kd) * dt * 3, 0, 45); A.vy = 0; } else A.vy += ((sin(pitch) * mf + (ku - kd)) * sp - A.vy) * k;
   let nx = A.x + A.vx * dt, nz = A.z + A.vz * dt, ny = A.y + A.vy * dt; const r = hypot(nx, nz); if (r > 150) { nx *= 150 / r; nz *= 150 / r; } if (nx > 120) nz = nz < -72 ? -72 : nz > 72 ? 72 : nz;
   const g0 = ground(nx, 2, nz);
   if (g0 > (ray ? -0.5 : -1.2)) { A.vx = A.vz = 0; nx = A.x; nz = A.z; }
   else if (sdp(nx, ny, nz) > -0.05) { A.vx = A.vz = A.vy = 0; nx = A.x; nz = A.z; ny = A.y; }
   A.x = nx; A.z = nz;
   const g = seabed(A.x, A.z);
-  if (ray) { const ty = g > -1e8 ? g + 0.16 + A.off * (1 - A.dig) - A.dig * 0.27 : A.y; A.y += (ty - A.y) * min(1, dt * 8); }
+  if (ray) { const ty = g > -1e8 ? min(g + 0.16 + A.off * (1 - A.dig) - A.dig * 0.27, -0.5) : A.y; A.y += (ty - A.y) * min(1, dt * 8); }
   else { if (g > -1e8 && ny < g + 0.35) ny = g + 0.35; A.y = ny > -0.5 ? -0.5 : ny < -50 ? -50 : ny; }
   const hs = hypot(A.vx, A.vz); if (hs > 0.2) avTurn(atan2(A.vz, A.vx), ray ? 5 : 3, dt);
   if (!ray) A.pitch += (atan2(A.vy, max(hs, 1)) - A.pitch) * min(1, dt * 4); else A.pitch = 0;
@@ -936,8 +939,8 @@ function finMove(dt, yaw, pitch, mf, mr, fast) {
   F[CX] = A.x; F[CY] = A.y + (ray ? 0.3 : 0); F[CZ] = A.z;
   if (ray) { // anyone wading or swimming close enough is stung (a buried ray reaches a little further: it is an ambush)
     const reach = bur ? 1.7 : 1.0;
-    for (const b of ACT) if ((b.k === 'P' || b.k === 'V' || b.k === 'N') && b.pose !== 2 && b.ft <= 0 && ground(b.x, 2, b.z) < -0.05 && abs(b.y - A.y) < 2.2 && hypot(b.x - A.x, b.z - A.z) < reach) {
-      crabPinchPerson(b, A.x, A.z); b.ft = 4; stung++; roleHud(); toast(['Ouch! Something stung me!', 'Aaah! A stingray!', 'Ow! My foot!'][stung % 3], 1); if (CLICK) CLICK(0, 0.5); A.pinchT = 0.5;
+    for (const b of ACT) if ((b.k === 'P' || b.k === 'V' || b.k === 'N' || b.k === 'R') && b.pose !== 2 && b.ft <= 0 && ground(b.x, 2, b.z) < -0.05 && (b.k === 'N' || b.k === 'R' ? A.y > -2.4 : abs(b.y - A.y) < 2.2) && hypot(b.x - A.x, b.z - A.z) < reach + (b.k === 'R' ? 0.4 : 0)) {
+      if (b.k === 'N' || b.k === 'R') { b.ft = 4; b.fx = A.x; b.fz = A.z; } else crabPinchPerson(b, A.x, A.z); b.ft = 4; stung++; roleHud(); toast(b.k === 'N' || b.k === 'R' ? ['Ouch! Something stung me from below!', 'Aaah! A stingray!', 'Ow! My leg!'][stung % 3] : ['Ouch! Something stung me!', 'Aaah! A stingray!', 'Ow! My foot!'][stung % 3], 1); if (CLICK) CLICK(0, 0.5); A.pinchT = 0.5;
     }
     A.pinchT -= dt;
   } else {
@@ -977,10 +980,21 @@ function emitBPrey(dt) {
   }
 }
 function doBury() { const A = AV; if (A.digT) { A.digT = 0; return; } const g = seabed(A.x, A.z); if (g > -1e8 && A.y < g + 1.2) { A.digT = 1; A.vx = A.vz = 0; callCd = 0.8; } else toast('Glide down to the sea floor first'); }
+// a kayak you paddle: it stays on the water, turns slowly toward where you look, and B digs in for a few seconds of speed
+function kayakMove(dt, yaw, mf, fast) {
+  const A = AV, sy = sin(yaw), cw = cos(yaw); A.boost = max(0, (A.boost || 0) - dt);
+  avTurn(atan2(-cw, sy), 1.7, dt);
+  const want = mf > 0 ? (A.boost > 0 ? 7 : fast ? 4.6 : 2.6) : mf < 0 ? -1.2 : 0;
+  A.sp += (want - A.sp) * min(1, dt * 1.2);
+  const nx = A.x + cos(A.hd) * A.sp * dt, nz = A.z + sin(A.hd) * A.sp * dt, r = hypot(nx, nz);
+  if (ground(nx, 2, nz) > -0.45 || sdp(nx, -0.3, nz) > -0.05 || r > 150 || (nx > 120 && abs(nz) > 72)) A.sp *= 0.5; else { A.x = nx; A.z = nz; }
+  A.y = -0.05 + 0.02 * sin(F[TIME] * 1.3); A.mv = abs(A.sp); A.ph += A.sp * dt * 2.4;
+  F[CX] = A.x; F[CY] = A.y + 0.9; F[CZ] = A.z;
+}
 let camClose = false, bitten = 0;
 function placeCamera() {
   const pit = F[PIT], yw = F[YAW], cp = cos(pit), fx = cp * sin(yw), fy = sin(pit), fz = -cp * cos(yw);
-  const D = ROLE === 5 ? 1.9 : ROLE === 7 ? 6 : ROLE === 8 ? 5 : ROLE === 9 ? 4 : ROLE === 6 ? 3 : ROLE === 4 ? 5 : ROLE === 2 ? 4.2 : ROLE === 1 ? 3.6 : 3.2, up = 0.5, ex = F[CX], ey = F[CY], ez = F[CZ];
+  const D = ROLE === 5 ? 1.9 : ROLE === 7 ? 6 : ROLE === 8 ? 5 : ROLE === 9 ? 4 : ROLE === 10 ? 7 : ROLE === 6 ? 3 : ROLE === 4 ? 5 : ROLE === 2 ? 4.2 : ROLE === 1 ? 3.6 : 3.2, up = 0.5, ex = F[CX], ey = F[CY], ez = F[CZ];
   let t = D;
   for (let s = 0.5; s <= D; s += 0.5) if (sdp(ex - fx * s, ey - fy * s + up * s / D, ez - fz * s) > -0.4) { t = max(s - 0.5, 0.3); break; }
   EY[0] = ex; EY[1] = ey; EY[2] = ez; camClose = t < 1.1; F[CX] = ex - fx * t; F[CY] = ey - fy * t + up * t / D; F[CZ] = ez - fz * t; swapped = true;
@@ -1039,6 +1053,11 @@ function emitAvatar() {
     emit(22, A.x, A.y, A.z, atan2(-sin(A.hd), cos(A.hd)), A.pitch, 0, 13.4, A.ph, min(1, A.mv / 4) * 0.99, 1.3, 11);
   } else if (ROLE === 9) {
     emit(23, A.x, A.y, A.z, atan2(-sin(A.hd), cos(A.hd)), 0, 0, 15.4, A.ph, (A.dig > 0.5 ? 0 : min(1, A.mv / 3)) * 0.99, 1.3, 11);
+  } else if (ROLE === 10) {
+    const yk = atan2(-sin(A.hd), cos(A.hd)), yp = atan2(cos(A.hd), sin(A.hd)), fx = cos(A.hd), fz = sin(A.hd);
+    emit(12, A.x, A.y, A.z, yk, 0, 0, 0.37, 0, 0); emit(1, A.x, A.y + 0.05, A.z, yp, 0, 0, 0.37, A.ph, 6);
+    emit(14, A.x + fx * 0.35, A.y + 0.55, A.z + fz * 0.35, yk, 0, sin(A.ph) * 0.45, 0.37, 0, 0);
+    if (A.mv > 1.5) emit(15, A.x - fx * 1.7, 0.01, A.z - fz * 1.7, yk, 0, 0, 0.3, 0, 0, 0.5 + A.mv * 0.08);
   } else if (ROLE === 5) {
     emit(17, A.x, A.y - A.dig * 0.07 * 1.3, A.z, A.byaw, 0, 0, 0.35, A.ph, A.dig > 0.1 ? 2 + (A.digT !== A.dig ? 0.99 : 0) : A.pinchT > 0 ? 1.99 : A.mv ? 0.99 : 0, 1.3, 15);
   } else if (ROLE === 2 || ROLE === 4) {
@@ -1085,6 +1104,7 @@ function doCall() {
   }
   else if (ROLE === 7) doLeap();
   else if (ROLE === 8) scanSea();
+  else if (ROLE === 10) { callCd = 4; AV.boost = 3; toast('Paddling hard!'); }
   else if (ROLE === 9) doBury();
   else if (ROLE === 4) {
     callCd = 1;
@@ -1709,7 +1729,7 @@ if (TOUCHUI && !mob) { let dn = false; canvas.addEventListener('mousedown', () =
 // touch buttons: next viewpoint, next role, view, the animal's call (B) and its special action (E: charge, dig, take off)
 var vpI = 7;
 const TB = [1, 2, 3, 4, 5, 6, 7].map((i) => $('t' + i)), SPECIAL = { 1: 'Charge', 2: 'Take off', 4: 'Take off', 5: 'Dig' };
-const TLAB = ['', 'Bark', 'Squawk', 'Warn', 'Dive', 'Pinch', 'Grunt', 'Leap', 'Scan', 'Hide'];
+const TLAB = ['', 'Bark', 'Squawk', 'Warn', 'Dive', 'Pinch', 'Grunt', 'Leap', 'Scan', 'Hide', 'Sprint'];
 var tbUpdate = () => { TB[1].textContent = ROLE ? 'Role: ' + ROLES[ROLE] : 'Role'; TB[2].hidden = !ROLE; TB[3].hidden = !ROLE; TB[3].textContent = TLAB[ROLE]; TB[4].hidden = !SPECIAL[ROLE]; TB[4].textContent = SPECIAL[ROLE] || ''; TB[5].hidden = ROLE !== 2; };
 const tbOn = (b, f) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound(); f(e); });
 tbOn(TB[0], () => { if (ROLE) setRole(0); vpI = (vpI + 1) % 8; lookAt(...POSES[vpI]); });
