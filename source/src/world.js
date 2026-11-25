@@ -771,10 +771,19 @@ function meshBush() {
   for (let i = 0; i < 3; i++) blob(m, rr(-0.5, 0.5), 0.3, rr(-0.5, 0.5), rr(0.55, 0.85), 0.8);
   return m;
 }
-// a box with its top at y = 0: x in [x0, x1], z in [-hz, hz], y down to -dy
+// a box with soft rounded edges (shared vertices, so the shading rolls round the rim): x in [x0, x1], z in [zc - hz, zc + hz], top at y0, down to y0 - dy
 function box(m, x0, x1, hz, dy, y0 = 0, zc = 0) {
-  const v = [[x0, y0 - dy, zc - hz], [x1, y0 - dy, zc - hz], [x1, y0, zc - hz], [x0, y0, zc - hz], [x0, y0 - dy, zc + hz], [x1, y0 - dy, zc + hz], [x1, y0, zc + hz], [x0, y0, zc + hz]];
-  for (const f of [[0, 3, 2, 1], [4, 5, 6, 7], [0, 4, 7, 3], [1, 2, 6, 5], [3, 7, 6, 2], [0, 1, 5, 4]]) { const q = f.map((i) => m.v(...v[i], 1)); m.quad(...q); }
+  const h = [(x1 - x0) / 2, dy / 2, hz], c = [(x0 + x1) / 2, y0 - dy / 2, zc], r = min(0.05, min(...h) * 0.9), a = h.map((q) => q - r), seen = new Map();
+  const co = (ax) => [-a[ax] - r, -a[ax] - r * 0.65, -a[ax] - r * 0.3, -a[ax], a[ax], a[ax] + r * 0.3, a[ax] + r * 0.65, a[ax] + r];
+  const vert = (p) => {
+    const d = p.map((q, k) => q - clamp(q, -a[k], a[k])), l = hypot(...d) || 1, w = p.map((q, k) => c[k] + clamp(q, -a[k], a[k]) + d[k] / l * r), key = w.map((q) => q.toFixed(4)).join();
+    if (!seen.has(key)) seen.set(key, m.v(w[0], w[1], w[2], 1));
+    return seen.get(key);
+  };
+  for (const [f, u, v] of [[0, 1, 2], [1, 2, 0], [2, 0, 1]]) for (const s of [-1, 1]) {
+    const cu = co(u), cv = co(v), g = cu.map((x) => cv.map((y) => { const p = [0, 0, 0]; p[f] = s * h[f]; p[u] = x; p[v] = y; return vert(p); }));
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) { if (s > 0) m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); else m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); }
+  }
 }
 const meshStep = () => { const m = new Mesh(); box(m, -0.33, 0.33, 1.72, 0.32); return m; };
 function meshRail() {
@@ -848,9 +857,9 @@ function meshTowerW() {
 }
 
 // ---------------------------------------------------------------- people, animals
-// the aux value of a vertex is its body part. People: skin .15, top .4, bottom .6, hair .78 (also eyes, nose), bright .93.
+// the aux value of a vertex is its body part. People: skin .15, top .4, bottom .6, hair .79 (cap, coloured per person; .78 is eyes and nose), long hair .8 (girls only), bright .93.
 // Sea lions and seals: fur .5, flippers and ears .65, eyes and nose .78, whiskers .93. Gulls: body .1, wing .3, wing tip .5, beak .7, feet .85, eye .95.
-const AUX = { skin: 0.15, top: 0.4, bottom: 0.6, hair: 0.78, bright: 0.93 };
+const AUX = { skin: 0.15, top: 0.4, bottom: 0.6, hair: 0.78, hc: 0.79, hl: 0.8, bright: 0.93 };
 const cr = (a, b, c, d, t) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
 // Catmull-Rom resampling of a path of number arrays (position, radii, ...): f points per segment, so bodies come out smooth
 function resample(P, f) {
@@ -888,7 +897,7 @@ const prings = (m, R, sides = 16, f = 3) => prings0(m, R, sides, f);
 function prings0(m, R, sides, f) { rings(m, R.map((r) => [r[0], r[1], r[2], r[3] * 0.92, r[4] * 0.9, r[5]]), sides, f); }
 function head(m, c) {
   const A = AUX, LP = 0.29, WH = 1;
-  ball(m, c, 0.098, A.skin, 1.14, 2);
+  ball(m, c, 0.098, A.skin, 1.14, 3);
   ball(m, [c[0], c[1] - 0.034, c[2] + 0.042], 0.07, A.skin, 0.95, 2);                         // jaw, cheeks and chin
   ball(m, [c[0], c[1] - 0.052, c[2] + 0.07], 0.03, A.skin, 0.8, 1);
   ball(m, [c[0], c[1] - 0.008, c[2] + 0.094], 0.017, A.skin, 1.3, 2);                         // nose
@@ -899,8 +908,8 @@ function head(m, c) {
     ball(m, [c[0] + s * 0.037, c[1] + 0.014, c[2] + 0.093], 0.0075, A.hair, 1, 1);            // the iris
     limb(m, [[c[0] + s * 0.018, c[1] + 0.042, c[2] + 0.088], [c[0] + s * 0.058, c[1] + 0.046, c[2] + 0.08]], [0.005, 0.004], A.hair, 4, 1);   // brows
   }
-  ball(m, [c[0], c[1] + 0.03, c[2] - 0.014], 0.106, A.hair, 0.78, 2); ball(m, [c[0], c[1] - 0.025, c[2] - 0.078], 0.07, A.hair, 1.05, 1);
-  ball(m, [c[0], c[1] + 0.066, c[2] + 0.05], 0.05, A.hair, 0.5, 1);                           // a fringe
+  ball(m, [c[0], c[1] + 0.03, c[2] - 0.014], 0.106, A.hc, 0.78, 3); ball(m, [c[0], c[1] - 0.025, c[2] - 0.078], 0.07, A.hc, 1.05, 2);
+  ball(m, [c[0], c[1] + 0.066, c[2] + 0.05], 0.05, A.hc, 0.5, 2);                           // a fringe
 }
 const hand = (m, c, s, aux) => {
   ball(m, c, 0.026, aux, 1.4);                                                                 // palm
@@ -911,11 +920,27 @@ const foot = (m, s, y0, z0, aux) => {
   plimb(m, [[s * 0.105, y0 + 0.02, z0 - 0.04], [s * 0.105, y0 - 0.005, z0 + 0.06], [s * 0.105, y0 - 0.015, z0 + 0.14]], [0.044, 0.042, 0.032], aux, 10, 2);
   for (let k = 0; k < 5; k++) ball(m, [s * (0.105 + (2 - k) * 0.0095 * (s > 0 ? -1 : 1) * -1), y0 - 0.014, z0 + 0.165 - (k === 0 ? 0.0 : 0.006 * k)], 0.0085 - k * 0.0007, aux, 0.8, 1);
 };
+// long hair, drawn on everybody and folded away by the vertex shader on the boys: strands hang from the crown, thick in the middle and
+// lying in front of the ears, each a smooth tube. d moves the whole head (sitting, crouching), n is how many tube sections to keep.
+function longHair(m, d = [0, 0, 0], len = 1) {
+  const HL = AUX.hl, cut = (P) => P.slice(0, max(2, Math.ceil(P.length * len))).map((q) => [q[0] + d[0], q[1] + d[1] * 1, q[2] + d[2]]);
+  limb(m, cut([[0, 1.76, -0.07], [0, 1.68, -0.125], [0, 1.52, -0.158], [0, 1.34, -0.166], [0, 1.18, -0.152]]), [0.052, 0.058, 0.058, 0.052, 0.035].slice(0, max(2, Math.ceil(5 * len))), HL, 10, 3);
+  for (const s of [-1, 1]) {
+    limb(m, cut([[s * 0.06, 1.75, -0.065], [s * 0.065, 1.67, -0.12], [s * 0.07, 1.52, -0.15], [s * 0.07, 1.34, -0.158], [s * 0.065, 1.2, -0.145]]), [0.045, 0.05, 0.05, 0.046, 0.03].slice(0, max(2, Math.ceil(5 * len))), HL, 10, 3);
+    limb(m, cut([[s * 0.1, 1.74, -0.02], [s * 0.115, 1.63, -0.07], [s * 0.118, 1.49, -0.1], [s * 0.112, 1.33, -0.12], [s * 0.1, 1.21, -0.112]]), [0.032, 0.04, 0.04, 0.038, 0.024].slice(0, max(2, Math.ceil(5 * len))), HL, 8, 3);
+  }
+}
+// a cluster of tubes that lies on the towel behind a head
+function hairFan(m, hx, hy, hz) {
+  const HL = AUX.hl;
+  limb(m, [[hx, hy - 0.03, hz - 0.08], [hx, hy - 0.075, hz - 0.2], [hx, hy - 0.092, hz - 0.4]], [0.06, 0.055, 0.03], HL, 10, 3);
+  for (const s of [-1, 1]) limb(m, [[hx + s * 0.07, hy - 0.04, hz - 0.06], [hx + s * 0.1, hy - 0.08, hz - 0.18], [hx + s * 0.13, hy - 0.093, hz - 0.36]], [0.04, 0.04, 0.022], HL, 8, 3);
+}
 // an upright person (the other poses are built from it or bend its parts)
-function bodyStanding(m) {
+function bodyStanding(m, hair = true) {
   const A = AUX;
   prings(m, [[0, 0.88, 0, 0.16, 0.11, A.bottom], [0, 0.97, 0, 0.158, 0.108, A.bottom], [0, 0.97, 0, 0.165, 0.112, A.top], [0, 1.1, 0, 0.14, 0.095, A.top], [0, 1.25, 0, 0.15, 0.1, A.top], [0, 1.36, 0, 0.17, 0.112, A.top], [0, 1.43, 0, 0.19, 0.1, A.top], [0, 1.47, 0, 0.1, 0.07, A.top]]);
-  plimb(m, [[0, 1.46, 0], [0, 1.57, 0.008]], [0.05, 0.043], A.skin); head(m, [0, 1.67, 0.012]);
+  plimb(m, [[0, 1.46, 0], [0, 1.57, 0.008]], [0.05, 0.043], A.skin); head(m, [0, 1.67, 0.012]); if (hair) longHair(m);
   prings(m, [[0, 1.44, 0, 0.1, 0.08, A.top], [0, 1.47, 0, 0.075, 0.062, A.top]], 14, 1);   // collar
   for (const s of [-1, 1]) {
     plimb(m, [[s * 0.095, 0.93, 0], [s * 0.098, 0.72, 0.01], [s * 0.1, 0.62, 0.015]], [0.09, 0.083, 0.074], A.bottom);
@@ -931,7 +956,7 @@ function meshPerson(pose) {
   if (pose === 0) bodyStanding(m);
   else if (pose === 1) {
     prings(m, [[0, 0.1, 0, 0.16, 0.12, A.bottom], [0, 0.22, -0.01, 0.158, 0.112, A.bottom], [0, 0.22, -0.01, 0.165, 0.115, A.top], [0, 0.34, -0.03, 0.14, 0.095, A.top], [0, 0.5, -0.05, 0.165, 0.105, A.top], [0, 0.62, -0.07, 0.19, 0.1, A.top], [0, 0.67, -0.075, 0.1, 0.07, A.top]]);
-    plimb(m, [[0, 0.66, -0.075], [0, 0.76, -0.07]], [0.05, 0.043], A.skin); head(m, [0, 0.86, -0.058]);
+    plimb(m, [[0, 0.66, -0.075], [0, 0.76, -0.07]], [0.05, 0.043], A.skin); head(m, [0, 0.86, -0.058]); longHair(m, [0, -0.81, -0.07], 0.75);
     for (const s of [-1, 1]) {
       plimb(m, [[s * 0.095, 0.13, 0], [s * 0.1, 0.25, 0.22], [s * 0.1, 0.37, 0.42]], [0.09, 0.082, 0.068], A.bottom);
       plimb(m, [[s * 0.1, 0.37, 0.42], [s * 0.105, 0.2, 0.6], [s * 0.11, 0.06, 0.72]], [0.062, 0.054, 0.04], A.skin); foot(m, s, 0.05, 0.72, A.skin);
@@ -939,12 +964,14 @@ function meshPerson(pose) {
       plimb(m, [[s * 0.23, 0.45, 0.02], [s * 0.2, 0.43, 0.2], [s * 0.16, 0.4, 0.38]], [0.045, 0.04, 0.034], A.skin); hand(m, [s * 0.15, 0.4, 0.41], s, A.skin);
     }
   } else if (pose === 2) {
-    const o = new Mesh(); bodyStanding(o);
+    const o = new Mesh(); bodyStanding(o, false);
     mergeT(m, o, (x, y, z) => [x, z + 0.12, -y]);                              // laid on the back, head toward -z
+    hairFan(m, 0, 0.17, -1.67);
     const n0 = m.p.length / 3; box(m, -0.5, 0.5, 1.05, 0.03, 0.03, -0.7); for (let k = n0; k < m.aux.length; k++) m.aux[k] = A.bright;
   } else if (pose === 3) {
     plimb(m, [[0, 0.3, -0.12], [0, 0.47, -0.02], [0, 0.66, 0.1]], [0.15, 0.15, 0.16], A.top, 12);
     plimb(m, [[0, 0.66, 0.1], [0, 0.73, 0.15]], [0.05, 0.045], A.skin); head(m, [0, 0.84, 0.2]);
+    limb(m, [[0, 0.93, 0.15], [0, 0.9, 0.08], [0, 0.84, 0.03], [0, 0.78, 0.05]], [0.045, 0.045, 0.04, 0.025], AUX.hl, 10, 3);
     ball(m, [0, 0.3, -0.1], 0.16, A.bottom, 0.8);
     for (const s of [-1, 1]) {
       plimb(m, [[s * 0.1, 0.3, -0.08], [s * 0.13, 0.36, 0.22]], [0.088, 0.07], A.bottom); plimb(m, [[s * 0.13, 0.36, 0.22], [s * 0.115, 0.2, 0.17], [s * 0.11, 0.04, 0.1]], [0.062, 0.052, 0.042], A.skin); foot(m, s, 0.03, 0.05, A.skin);
@@ -1021,6 +1048,23 @@ function meshSeal() {
     for (let k = 0; k < 5; k++) limb(m, [[px[11], py[11] - 0.01, 0.03 * s], [px[11] + 0.1, py[11] + (k - 2) * 0.022, (0.1 + 0.02 * (k % 3)) * s]], [0.003, 0.002], AUX.bright, 3, 1);
     blade(m, [[0.42, -0.06, 0.15 * s], [0.34, -0.1, 0.25 * s], [0.28, -0.12, 0.33 * s]], [0.07, 0.1, 0.07], 0.02, FL, 2);
     blade(m, [[-0.78, 0.02, 0.02 * s], [-1.0, 0.02, 0.08 * s], [-1.2, 0.02, 0.14 * s]], [0.1, 0.18, 0.24], 0.02, FL);
+  }
+  return m;
+}
+// a bottlenose dolphin, +x forward, centred on its body: smooth torpedo, a melon and a short beak, a curved dorsal fin, flippers and horizontal flukes.
+// aux .5 body (the shader makes the belly pale), .65 fins, .78 eye
+function meshDolphin() {
+  const m = new Mesh(), F = 0.5, FN = 0.65, D = AUX.hair;
+  const px = [-1.25, -1.0, -0.6, -0.1, 0.4, 0.8, 1.05, 1.22, 1.36, 1.46];
+  const py = [0.0, 0.0, 0.01, 0.02, 0.03, 0.05, 0.08, 0.08, 0.05, 0.035];
+  const ry = [0.03, 0.07, 0.15, 0.24, 0.265, 0.22, 0.17, 0.1, 0.045, 0.03], rz = [0.04, 0.07, 0.13, 0.2, 0.23, 0.19, 0.15, 0.09, 0.04, 0.028];
+  etube(m, px.map((x, k) => [x, py[k], 0]), ry, rz, F, 24, 4);
+  ball(m, [1.47, 0.035, 0], 0.03, F, 0.9, 2);
+  blade(m, [[0.15, 0.22, 0], [0.0, 0.36, 0], [-0.17, 0.5, 0], [-0.27, 0.56, 0]], [0.36, 0.3, 0.17, 0.03], 0.03, FN, 3, [0, 0, 1]);        // dorsal fin
+  for (const s of [-1, 1]) {
+    ball(m, [1.02, 0.1, 0.17 * s], 0.026, D, 1, 2);                                                                                    // eyes
+    blade(m, [[0.56, -0.12, 0.17 * s], [0.42, -0.26, 0.34 * s], [0.28, -0.36, 0.5 * s]], [0.17, 0.2, 0.08], 0.035, FN, 3);             // pectoral flippers
+    blade(m, [[-1.2, 0.0, 0.015 * s], [-1.36, 0.02, 0.18 * s], [-1.55, 0.04, 0.42 * s], [-1.66, 0.05, 0.55 * s]], [0.15, 0.2, 0.15, 0.03], 0.035, FN, 3);   // flukes
   }
   return m;
 }

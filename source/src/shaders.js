@@ -297,7 +297,12 @@ fn partC(ao: f32, sd: f32) -> vec3f {
   if (ao < .3) { return mix(skinC(a), vec3f(.55, .2, .2), step(.27, ao) * .75); }
   if (ao < .5) { return topC(b); }
   if (ao < .7) { return botC(c); }
-  if (ao < .85) { return mix(vec3f(.02, .015, .01), vec3f(.35, .22, .08), step(.75, a) * c); }
+  if (ao < .85) {   // eyes, brows and noses are dark; hair (.79 and the long hair .8) is black, brown, auburn or blonde
+    if (ao < .785) { return vec3f(.02, .015, .01); }
+    let h = fract(sd * 17.9 + .2); var hc = vec3f(.03, .022, .016);
+    hc = mix(hc, vec3f(.2, .11, .05), step(.4, h)); hc = mix(hc, vec3f(.42, .17, .07), step(.7, h)); hc = mix(hc, vec3f(.78, .6, .3), step(.86, h));
+    return hc * (.9 + .25 * c);
+  }
   if (ao > .97) { return vec3f(.92, .95, .95); }
   return mix(vec3f(.9, .35, .05), vec3f(.1, .5, .8), step(.5, b)) * (.7 + .3 * c);
 }
@@ -351,6 +356,8 @@ fn rotZ(p: vec3f, c: vec3f, a: f32) -> vec3f { let d = p - c; let s = sin(a); le
 // People (material 10) and sea lions (11) are posed in the vertex shader. c.z is the gait / kick phase and c.w = pose + amount * .99
 // (people: 0 standing and walking, 1 sitting and waving, 2 lying, 3 crouching and digging, 4 snorkeler with head up; sea lions: 0 on land, 1 swimming;
 // a sea lion's amount is .49 * head raise + .5 when it is moving). Heads turn to look at the camera.
+// head turns pull the hair along: a long strand follows the head by less and less the lower it hangs
+fn hw(y: f32, th: f32, hl: f32) -> f32 { return select(step(th, y), ss(th - .32, th + .05, y), hl > .5); }
 fn animActor(i: VI) -> vec3f {
   var p = i.p; let t = g.cam.w; let sd = i.c.y; let ph = i.c.z;
   let pose = floor(i.c.w); let r = i.c.w - pose;
@@ -406,6 +413,8 @@ fn animActor(i: VI) -> vec3f {
     }
   } else if (i.c.x < 10.5) {
     let amt = r / .99;
+    let hairL = step(.795, i.n.w) * step(i.n.w, .805);
+    if (hairL > .5 && fract(sd * 11.3 + .4) > .5) { return vec3f(0.); }   // long hair belongs to the girls only
     var look = mix(sin(t * .35 + sd * 40.) * .5, clamp(atan2(lq.x, lq.z), -1.1, 1.1) * ss(-.2, .5, lq.z / max(length(lq.xz), .01)), near);
     if (pose < .5) {
       let side = select(-1., 1., q0.x > 0.); let s = ph + select(3.14159, 0., q0.x > 0.);
@@ -420,11 +429,11 @@ fn animActor(i: VI) -> vec3f {
         p = mix(p, rotX(pa, vec3f(side * .2, 1.42, 0.), -sin(s) * .55 * amt), aw);
       }
       p.y += sin(t * 1.8 + sd * 9.) * .004 * ss(1.1, 1.4, q0.y);
-      if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.52, 0.), look * .9); }
+      p = rotY(p, vec3f(0., 1.52, 0.), look * .9 * hw(q0.y, 1.52, hairL));
     } else if (pose < 1.5) {
       let aw = ss(.12, .19, q0.x) * step(.36, q0.y) * step(q0.y, .72);
       p = mix(p, rotZ(p, vec3f(.2, .66, -.08), amt * 2.3 + sin(t * 7. + sd * 9.) * .22 * amt), aw);
-      if (q0.y > .8) { p = rotY(p, vec3f(0., .8, -.05), look * .9); }
+      p = rotY(p, vec3f(0., .8, -.05), look * .9 * hw(q0.y, .8, hairL));
     } else if (pose < 2.5) {
       if (q0.z < -1.52) { p = rotY(p, vec3f(0., 0., -1.52), look * .7); }
       p.y += sin(t * 1.5 + sd * 9.) * .006 * ss(-.4, -1.2, q0.z);
@@ -432,7 +441,7 @@ fn animActor(i: VI) -> vec3f {
       let aw = step(.14, abs(q0.x)) * step(q0.y, .66) * step(.04, q0.y);
       let side = select(-1., 1., q0.x > 0.);
       if (aw > 0.) { p = rotX(p, vec3f(side * .19, .64, .1), sin(ph * 3. + side) * .5 * amt); }
-      if (q0.y > .74) { p = rotY(p, vec3f(0., .74, .15), look * .9); }
+      p = rotY(p, vec3f(0., .74, .15), look * .9 * hw(q0.y, .74, hairL));
     } else if (pose < 4.5) {
       if (q0.x > .58) { p = rotZ(p, vec3f(.5, 0., 0.), amt * .85); p = rotY(p, vec3f(.5, 0., 0.), look * .5 * amt); }
       p.y += sin(ph - q0.x * 5.) * .09 * max(-q0.x - .1, 0.);
@@ -443,17 +452,17 @@ fn animActor(i: VI) -> vec3f {
         if (q0.y < 1.12) { pa = rotX(pa, vec3f(side * .23, 1.22, 0.), select(-.9, -.1, side > 0.) * amt); }
         p = mix(p, rotX(pa, vec3f(side * .2, 1.42, 0.), select(-1.9, -1.45 + sin(t * 10.) * .12, side > 0.) * amt), aw);
       }
-      if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.52, 0.), look * .9); p = rotX(p, vec3f(0., 1.52, 0.), -.12 * amt * (.5 + .5 * sin(t * 10.))); }
+      { let hh = hw(q0.y, 1.52, hairL); p = rotY(p, vec3f(0., 1.52, 0.), look * .9 * hh); p = rotX(p, vec3f(0., 1.52, 0.), -.12 * amt * (.5 + .5 * sin(t * 10.)) * hh); }
     } else if (pose < 6.5) {         // kayaker (sitting mesh): the arms row, the body twists
       let side = select(-1., 1., q0.x > 0.); let aw = ss(.12, .19, abs(q0.x)) * step(.36, q0.y) * step(q0.y, .72);
       p = mix(p, rotX(p, vec3f(side * .2, .66, -.08), sin(ph + select(0., 3.14159, q0.x > 0.)) * .55), aw);
       if (q0.y > .3) { p = rotY(p, vec3f(0., .3, 0.), sin(ph) * .2); }
-      if (q0.y > .8) { p = rotY(p, vec3f(0., .8, -.05), look * .8); }
+      p = rotY(p, vec3f(0., .8, -.05), look * .8 * hw(q0.y, .8, hairL));
     } else if (pose < 7.5) {         // paddle boarder: leans into each stroke, both arms on the paddle
       let side = select(-1., 1., q0.x > 0.); let aw = ss(.12, .2, abs(q0.x)) * step(.78, q0.y) * step(q0.y, 1.47);
       p = rotX(p, vec3f(0., 0., 0.), sin(ph) * .1 * ss(0., 1.2, q0.y));
       p = mix(p, rotX(p, vec3f(side * .2, 1.42, 0.), -.65 - sin(ph) * .3), aw);
-      if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.52, 0.), look * .9); }
+      p = rotY(p, vec3f(0., 1.52, 0.), look * .9 * hw(q0.y, 1.52, hairL));
     } else if (pose < 8.5) {         // surfer paddling out, prone (snorkeler mesh): head up, arms stroke
       let side = select(-1., 1., q0.z > 0.); let aw = step(.1, abs(q0.z)) * step(-.25, q0.x) * step(q0.x, .55);
       p = mix(p, rotZ(p, vec3f(.48, 0., side * .16), sin(ph + select(0., 3.14159, q0.z > 0.)) * .9), aw);
@@ -470,7 +479,7 @@ fn animActor(i: VI) -> vec3f {
       let lean = step(.9, q0.y);
       p = mix(p, rotX(p, vec3f(0., .9, 0.), .4), lean);
       p.y -= .22 * ss(.1, 1., q0.y);
-      if (q0.y > 1.52) { p = rotY(p, vec3f(0., 1.45, 0.), look * .5); }
+      p = rotY(p, vec3f(0., 1.45, 0.), look * .5 * hw(q0.y, 1.52, hairL));
     }
     if (kid > .5 && i.c.x < 10.5) {   // a child's head is bigger for its body
       if (pose < .5 && q0.y > 1.52) { p = vec3f(0., 1.5, 0.) + (p - vec3f(0., 1.5, 0.)) * 1.28; }
@@ -480,7 +489,13 @@ fn animActor(i: VI) -> vec3f {
   } else {
     let mv = step(.5, r); let alert = (r - mv * .5) / .49;
     let lyaw = clamp(atan2(-lq.z, lq.x), -1., 1.) * near * ss(.2, .8, lq.x / max(length(lq.xz), .01));
-    if (pose > 2.5) {   // a seal on land: it humps along on its belly, the head up, the short front flippers dragging
+    if (sd > 11.) {     // a dolphin: the whole body undulates up and down, the flukes most; amt is how hard it swims, pose 1 is airborne
+      let da = r / .99;
+      p.y += sin(ph + q0.x * 2.4) * (.05 + .12 * da) * ss(.9, -1.3, q0.x);
+      p.y += sin(ph + q0.x * 2.4) * .06 * da * ss(-1.2, -1.7, q0.x);
+      if (abs(q0.z) > .12 && q0.y < -.08 && q0.x > .2 && q0.x < .65) { p = rotX(p, vec3f(.55, -.1, sign(q0.z) * .17), sign(q0.z) * sin(ph * .9) * .25); }
+      p = mix(p, rotY(p, vec3f(.7, .05, 0.), lyaw * .35), ss(.7, 1.2, q0.x));
+    } else if (pose > 2.5) {   // a seal on land: it humps along on its belly, the head up, the short front flippers dragging
       let mvs = r / .99;
       p.y += max(0., sin(ph - q0.x * 4.5)) * .07 * mvs; p.z += sin(ph - q0.x * 3.) * .03 * mvs;
       p = mix(p, rotZ(p, vec3f(.45, .04, 0.), .5), ss(.45, .8, q0.x));
@@ -667,7 +682,14 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
       sl = mix(sl, vec3f(.08, .09, .1), spots * .6); sl = mix(sl, sl * 1.25, ss(.1, -.7, on.y) * .5);
       alb = mix(sl, alb, step(.7, i.ao) * step(i.ao, .85)); alb = mix(alb, vec3f(.78, .74, .66), step(.9, i.ao));
     }
-    bump = .5; gloss = mix(.3, .55, ss(.5, -.3, i.wp.y));
+    if (sd > 11.) {   // a bottlenose dolphin: slate back, pale belly, darker fins and a dark eye
+      var dc = mix(vec3f(.27, .32, .37), vec3f(.4, .45, .5), ss(-.1, -.8, on.y)) * (.85 + .3 * B.h);
+      dc = mix(dc, vec3f(.78, .8, .82), ss(.15, -.55, on.y) * step(i.ao, .6));
+      dc = mix(dc, vec3f(.21, .25, .29), step(.6, i.ao) * step(i.ao, .7));
+      alb = mix(dc, vec3f(.02), step(.7, i.ao) * step(i.ao, .85)); bump = .15; gloss = .7;
+    } else {
+      bump = .5; gloss = mix(.3, .55, ss(.5, -.3, i.wp.y));
+    }
   } else if (mat == 12) {
     let panel = step(.5, fract(atan2(i.op.z, i.op.x) * 4. / 3.14159));
     alb = mix(select(vec3f(.9, .9, .85), vec3f(.85, .08, .08), fract(sd * 3.7) < .5), select(vec3f(.9, .75, .1), vec3f(.1, .3, .75), fract(sd * 3.7) < .5), panel);

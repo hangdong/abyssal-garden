@@ -302,8 +302,8 @@ meshes.push(meshPalm().build(), meshTree(1).build(), meshTree(2).build(), meshBu
   meshPerson(0).build(), meshPerson(1).build(), meshPerson(2).build(), meshPerson(3).build(), meshUmbrella().build(), meshSeaLion(false).build(), meshCaveFrame().build(), meshNest().build());
 const GAR = meshGaribaldi().build(), SNORK = meshPerson(4).build(), LIONSWIM = meshSeaLion(true).build(), SEAL = meshSeal().build(), GULL = meshGull().build(), CHIP = meshChipmunk().build();
 const BOARD = meshSurfboard().build(), SUPB = meshSUPBoard().build(), KAYAK = meshKayak().build(), PAD1 = meshPaddle(false).build(), PAD2 = meshPaddle(true).build(), FOAM = meshFoam().build(), PELICAN = meshPelican().build(), CRAB = meshCrab().build(), BLOB = meshBlob(1, 1).build(), BLOBL = meshBlob(1.9, 0.85).build(), CFISH = meshCaughtFish().build();
-const DROP = meshDrop().build(), SPLAT = meshSplat().build();
-meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, BLOB, BLOBL, CFISH, DROP, SPLAT);
+const DROP = meshDrop().build(), SPLAT = meshSplat().build(), DOLPHIN = meshDolphin().build();
+meshes.push(GAR, SNORK, LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, BLOB, BLOBL, CFISH, DROP, SPLAT, DOLPHIN);
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
 const allV = new Uint8Array(nV * 16), allI = new Uint32Array(nI);
@@ -320,7 +320,7 @@ const drawDeco = (r) => { for (let k = 0; k < nDeco.length; k++) if (nDeco[k]) {
 // Every figure is an actor: a little state machine on the CPU (where it is, what it does, how it reacts to the camera) that
 // writes one instance per frame. The vertex shader poses it (walk cycle, digging, waving, head turn, breathing, swim stroke).
 // slots: 0-3 people (stand, sit, lie, crouch), 4 snorkeler, 5 sea lion on land, 6 sea lion swimming
-const SLM = [meshes[DECO0 + 11], meshes[DECO0 + 12], meshes[DECO0 + 13], meshes[DECO0 + 14], SNORK, meshes[DECO0 + 16], LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, CFISH, DROP, SPLAT];   // 19 a dropping, 20 its splat, 18 the pelican's fish, 17 crab, 16 pelican, 10 surfboard, 11 paddle board, 12 kayak, 13 paddle, 14 kayak paddle, 15 spray
+const SLM = [meshes[DECO0 + 11], meshes[DECO0 + 12], meshes[DECO0 + 13], meshes[DECO0 + 14], SNORK, meshes[DECO0 + 16], LIONSWIM, SEAL, GULL, CHIP, BOARD, SUPB, KAYAK, PAD1, PAD2, FOAM, PELICAN, CRAB, CFISH, DROP, SPLAT, DOLPHIN];   // 21 the dolphin, 19 a dropping, 20 its splat, 18 the pelican's fish, 17 crab, 16 pelican, 10 surfboard, 11 paddle board, 12 kayak, 13 paddle, 14 kayak paddle, 15 spray
 const NACT = Wd.actors.length, SLI = SLM.map(() => new Float32Array(NACT * 12)), SLN = new Uint32Array(SLM.length);
 const SLB = SLM.map(() => device.createBuffer({ size: NACT * 48, usage: BU.VERTEX | BU.COPY_DST }));
 const drawActors = (r) => { for (let s = 0; s < SLM.length; s++) if (SLN[s]) { r.setVertexBuffer(1, SLB[s]); r.drawIndexed(SLM[s].ib.length, SLN[s], SLM[s].i0, SLM[s].v0, 0); } };
@@ -684,7 +684,7 @@ function emitCraft(a) {
 }
 // ---------------------------------------------------------------- roles: swim as yourself, or be a sea lion, a gull or the lifeguard
 // T changes role, V swaps between the chase camera and the animal's own eyes, B calls: a bark, a squawk, or the lifeguard's warning.
-const ROLES = ['Swimmer', 'Sea lion', 'Gull', 'Lifeguard', 'Pelican', 'Crab', 'Seal'], CALLS = ['', 'bark  ·  E charge and bite', 'squawk  ·  P drop a dropping', 'warn the visitors', 'plunge-dive for fish', 'pinch  ·  E dig in / out', 'grunt'];
+const ROLES = ['Swimmer', 'Sea lion', 'Gull', 'Lifeguard', 'Pelican', 'Crab', 'Seal', 'Dolphin'], CALLS = ['', 'bark  ·  E charge and bite', 'squawk  ·  P drop a dropping', 'warn the visitors', 'plunge-dive for fish', 'pinch  ·  E dig in / out', 'grunt', 'leap out of the sea  ·  swim into fish to eat them'];
 let ROLE = 0, TPV = true, swapped = false, score = 0, callCd = 0, callT = 0, fishCaught = 0, pinched = 0;
 const PL = new Float64Array(3), EY = new Float64Array(3), DV = new Float64Array(7);
 // avatar: mode 0 on the ground (sea lion on land, gull walking), 1 in the water (swimming, floating), 2 in the air (gull)
@@ -692,7 +692,7 @@ const AV = { x: 0, y: 0, z: 0, hd: PI, pitch: 0, roll: 0, sp: 0, ph: 0, mode: 0,
 const HUDR = document.createElement('div');
 HUDR.style.cssText = 'position:fixed;top:1em;left:50%;transform:translateX(-50%);padding:.35em .9em;background:#0008;color:#e8fbff;font:600 .85em system-ui,sans-serif;border-radius:2em;pointer-events:none;z-index:5;white-space:nowrap';
 document.body.append(HUDR);
-function roleHud() { if (typeof tbUpdate === 'function') tbUpdate(); HUDR.textContent = ROLES[ROLE] + (TOUCHUI ? '' : ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 2 ? '  ·  hits: ' + poopHits : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : ''); }
+function roleHud() { if (typeof tbUpdate === 'function') tbUpdate(); HUDR.textContent = ROLES[ROLE] + (TOUCHUI ? '' : ROLE ? '  ·  T next role  ·  V view  ·  B ' + CALLS[ROLE] : '  ·  T: play as an animal or the lifeguard') + (ROLE === 3 ? '  ·  visitors turned back: ' + score : '') + (ROLE === 4 ? '  ·  fish caught: ' + fishCaught : '') + (ROLE === 2 ? '  ·  hits: ' + poopHits : '') + (ROLE === 5 ? '  ·  people pinched: ' + pinched : '') + (ROLE === 7 ? '  ·  fish eaten: ' + dolphFish : ''); }
 function setRole(r) {
   if (ROLE === 0) { DV[0] = F[CX]; DV[1] = F[CY]; DV[2] = F[CZ]; DV[3] = F[YAW]; DV[4] = F[PIT]; DV[5] = walk ? 1 : 0; DV[6] = above ? 1 : 0; }
   ROLE = r; perchOn = r === 2 || r === 4; walk = above = false; F[VX] = F[VY] = F[VZ] = 0; TPV = true; swapped = false; AV.vx = AV.vy = AV.vz = AV.sp = AV.mv = AV.pitch = AV.roll = 0;
@@ -702,6 +702,7 @@ function setRole(r) {
   else if (r === 4) { AV.x = 132; AV.y = 10; AV.z = -6; AV.hd = PI; AV.mode = 2; AV.sp = 6.5; F[YAW] = -PI / 2; F[PIT] = -0.1; }
   else if (r === 6) { AV.x = 143.5; AV.z = 12; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.mode = 0; F[YAW] = -PI / 2; F[PIT] = -0.2; }
   else if (r === 5) { AV.x = 147; AV.z = -10; AV.y = ground(AV.x, 4, AV.z); AV.hd = PI; AV.dig = AV.digT = 0; AV.byaw = 0; AV.pinchT = 0; F[YAW] = -PI / 2; F[PIT] = -0.25; }
+  else if (r === 7) { let x = 118; while (x > 60 && ground(x, 2, 0) > -3) x -= 4; AV.x = x; AV.z = 0; AV.y = -1.2; AV.hd = PI; AV.mode = 1; AV.out = false; AV.spin = 0; F[YAW] = -PI / 2; F[PIT] = -0.1; seedPrey(); }
   else { const T = Wd.tower; if (T) { F[CX] = T[0] - 4.8; F[CZ] = T[2] + 0.5; F[CY] = ground(F[CX], T[1] + 4.2, F[CZ]) + 1.7; } else { F[CX] = 182.5; F[CZ] = -14; F[CY] = ground(182.5, 12, -14) + 1.7; } walk = true; TPV = false; F[YAW] = -PI / 2; F[PIT] = -0.15; }   // first person: a chase camera would end up inside the cabin
   if (r === 1) { BB.x = AV.x - 1.6; BB.z = AV.z + 0.6; BB.y = ground(BB.x, 4, BB.z); BB.mode = 0; BB.hd = PI; }
   roleHud();
@@ -748,7 +749,7 @@ function lionMove(dt, yaw, pitch, mf, mr, fast) {
 }
 function lookMove(dt, yaw, pitch) {
   const fast = ks || tN > 1, mf = tId >= 0 && !TOUCHUI ? 0.7 : kf - kb, mr = kr - kl;
-  if (ROLE === 1 || ROLE === 6) lionMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 5) crabMove(dt, yaw, mf, mr, fast); else gullMove(dt, yaw, pitch, mf, mr, fast);
+  if (ROLE === 1 || ROLE === 6) lionMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 7) dolphinMove(dt, yaw, pitch, mf, mr, fast); else if (ROLE === 5) crabMove(dt, yaw, mf, mr, fast); else gullMove(dt, yaw, pitch, mf, mr, fast);
 }
 function gullMove(dt, yaw, pitch, mf, mr, fast) {
   const A = AV, sy = sin(yaw), cw = cos(yaw), P = ROLE === 4;
@@ -840,10 +841,79 @@ function crabMove(dt, yaw, mf, mr, fast) {
   A.ph += (A.mv * 9 + (A.pinchT > 0 ? 9 : 0)) * dt;
   F[CX] = A.x; F[CY] = A.y + 0.4 - A.dig * 0.15; F[CZ] = A.z;
 }
+// a dolphin you steer: it never leaves the sea except in a leap (B), an arc through the air; swim into fish to eat them, in the water or on the way through the air
+var dolphFish = 0, PREY = [];
+function dolphinMove(dt, yaw, pitch, mf, mr, fast) {
+  const A = AV, sy = sin(yaw), cw = cos(yaw), cp = cos(pitch);
+  if (A.mode === 2) { // a leap: a ballistic arc, the heading follows the view slowly and the body rolls over
+    A.vy -= 9.8 * dt;
+    const hs = hypot(A.vx, A.vz); let d = atan2(-cw, sy) - atan2(A.vz, A.vx); d = atan2(sin(d), cos(d)); const h = atan2(A.vz, A.vx) + clamp(d, -0.9 * dt, 0.9 * dt);
+    A.vx = cos(h) * hs; A.vz = sin(h) * hs;
+    const nx = A.x + A.vx * dt, nz = A.z + A.vz * dt;
+    if (ground(nx, 2, nz) < -1) { A.x = nx; A.z = nz; } else { A.vx *= 0.5; A.vz *= 0.5; }
+    A.y += A.vy * dt; avTurn(h, 6, dt);
+    A.pitch += (atan2(A.vy, max(hs, 1)) - A.pitch) * min(1, dt * 6); A.roll += A.spin * dt; A.ph += dt * 6; A.mv = hs;
+    if (!A.out && A.y > 0) { A.out = true; splash(A.x, A.z); }
+    if (A.out && A.y <= -0.05 && A.vy < 0) { splash(A.x, A.z); if (CLICK) CLICK(0, 0.6); A.mode = 1; A.y = -0.05; A.vy *= 0.3; A.roll = 0; A.spin = 0; A.out = false; }
+    else if (A.y < -50) { A.y = -50; A.mode = 1; }
+  } else { // in the water
+    const sp = fast ? 12 : 7, k = 1 - exp(-dt * 2.4);
+    A.vx += ((sy * cp * mf + cw * mr) * sp - A.vx) * k; A.vz += ((-cw * cp * mf + sy * mr) * sp - A.vz) * k; A.vy += ((sin(pitch) * mf + (ku - kd)) * sp - A.vy) * k;
+    let nx = A.x + A.vx * dt, ny = A.y + A.vy * dt, nz = A.z + A.vz * dt; const r = hypot(nx, nz); if (r > 150) { nx *= 150 / r; nz *= 150 / r; } if (nx > 120) nz = nz < -72 ? -72 : nz > 72 ? 72 : nz;
+    const g0 = ground(nx, 2, nz);
+    if (g0 > -1) { A.vx = A.vz = 0; ny = A.y; }   // the shallows and the beach are closed to it
+    else if (sdp(nx, ny, nz) > -0.05) { A.vx = A.vz = A.vy = 0; }
+    else { A.x = nx; A.z = nz; if (g0 > -1e8 && ny < g0 + 0.5) ny = g0 + 0.5; A.y = ny > -0.1 ? -0.1 : ny < -50 ? -50 : ny; }
+    const hs = hypot(A.vx, A.vz); if (hs > 0.3) avTurn(atan2(A.vz, A.vx), 3.2, dt);
+    A.pitch += (atan2(A.vy, max(hs, 1)) - A.pitch) * min(1, dt * 4); A.roll *= 1 - min(1, dt * 4); A.mv = hs; A.ph += dt * (2.2 + hs * 0.9);
+  }
+  F[CX] = A.x; F[CY] = A.y; F[CZ] = A.z;
+  // the mouth: a fish within reach is eaten
+  const hx = A.x + cos(A.hd) * cos(A.pitch) * 1.35, hy = A.y + sin(A.pitch) * 1.35, hz = A.z + sin(A.hd) * cos(A.pitch) * 1.35;
+  for (const f of PREY) if (hypot(f.x - hx, f.y - hy, f.z - hz) < 1.2) {
+    dolphFish += f.air ? 2 : 1; roleHud(); toast(f.air ? 'A fish caught in mid-air! +2' : ['Yum! A fish.', 'Gulp!', 'Tasty!'][dolphFish % 3]); if (CLICK) CLICK(0, 0.35); placePrey(f, 22, 50);
+  }
+}
+function doLeap() {
+  const A = AV; if (A.mode !== 1) return;
+  callCd = 1.2; const hs = max(hypot(A.vx, A.vz), 6), y = max(A.y, -9);
+  A.vx = cos(A.hd) * hs; A.vz = sin(A.hd) * hs; A.vy = sqrt(19.6 * (2.4 - y)); A.mode = 2; A.out = false; A.spin = rnd() < 0.5 ? 0 : (rnd() < 0.5 ? 1 : -1) * 5;
+  if (CLICK) CLICK(0, 0.4);
+}
+// fish for the dolphin: schools of silver fish that swim about, scatter when it comes close and sometimes leap clear of the water
+function placePrey(f, dmin, dmax) {
+  for (let t = 0; t < 30; t++) {
+    const a = rnd() * TAU, d = rr(dmin, dmax), x = AV.x + cos(a) * d, z = AV.z + sin(a) * d, g = ground(x, 2, z);
+    if (x < 126 && x > -140 && abs(z) < 70 && (g < -3 || g < -1e8)) { f.x = x; f.z = z; f.y = -rr(0.5, 2.2); if (g > -1e8 && f.y < g + 0.6) f.y = g + 0.6; f.ty = f.y; f.air = 0; f.vy = 0; f.hd = rnd() * TAU; f.sp = 1; f.tm = 1 + rnd() * 2; return; }
+  }
+  f.x = AV.x; f.z = AV.z; f.y = -3; f.ty = -3; f.air = 0;
+}
+function seedPrey() { PREY.length = 0; for (let i = 0; i < 22; i++) { const f = { seed: 20 + rnd() }; placePrey(f, 8, 45); PREY.push(f); } }
+function emitPrey(dt) {
+  if (ROLE !== 7) return; const t = F[TIME];
+  for (const f of PREY) {
+    const dx = f.x - AV.x, dz = f.z - AV.z, d = hypot(dx, f.y - AV.y, dz);
+    if (f.air) {
+      f.vy -= 9.8 * dt; f.x += cos(f.hd) * f.sp * dt; f.z += sin(f.hd) * f.sp * dt; f.y += f.vy * dt;
+      if (f.y <= -0.2 && f.vy < 0) { f.air = 0; f.y = -0.3; f.ty = -1.2; f.sp = 3; splash(f.x, f.z); }
+    } else {
+      f.tm -= dt; if (f.tm < 0) { f.hd += rr(-1.1, 1.1); f.sp = rr(0.6, 1.6); f.ty = -rr(0.5, 2.8); f.tm = 1 + rnd() * 2.5; }
+      let sp = f.sp;
+      if (d < 10) { f.hd = atan2(dz, dx) + rr(-0.4, 0.4) * dt * 10; sp = 5; f.ty = f.y; if (f.y > -1.3 && rnd() < dt * 0.9) { f.air = 1; f.vy = rr(4.2, 6); f.sp = 5.5; f.hd = atan2(dz, dx) + rr(-0.6, 0.6); } }
+      const nx = f.x + cos(f.hd) * sp * dt, nz = f.z + sin(f.hd) * sp * dt, g = ground(nx, 2, nz);
+      if (nx < 126 && (g < -2 || g < -1e8)) { f.x = nx; f.z = nz; } else { f.hd += PI * 0.7; f.tm = 0.5; }
+      if (g > -1e8 && f.ty < g + 0.5) f.ty = g + 0.5;
+      f.y += (min(f.ty, -0.3) - f.y) * min(1, dt * 2);
+      if (d > 90) placePrey(f, 25, 50);
+    }
+    const yaw = atan2(-sin(f.hd), cos(f.hd));
+    emit(18, f.x, f.y, f.z, yaw + sin(t * 14 + f.seed * 30) * 0.18, f.air ? atan2(f.vy, f.sp) : 0, 0, f.seed, 0, 0, 1.6, 10);
+  }
+}
 let camClose = false, bitten = 0;
 function placeCamera() {
   const pit = F[PIT], yw = F[YAW], cp = cos(pit), fx = cp * sin(yw), fy = sin(pit), fz = -cp * cos(yw);
-  const D = ROLE === 5 ? 1.9 : ROLE === 6 ? 3 : ROLE === 4 ? 5 : ROLE === 2 ? 4.2 : ROLE === 1 ? 3.6 : 3.2, up = 0.5, ex = F[CX], ey = F[CY], ez = F[CZ];
+  const D = ROLE === 5 ? 1.9 : ROLE === 7 ? 6 : ROLE === 6 ? 3 : ROLE === 4 ? 5 : ROLE === 2 ? 4.2 : ROLE === 1 ? 3.6 : 3.2, up = 0.5, ex = F[CX], ey = F[CY], ez = F[CZ];
   let t = D;
   for (let s = 0.5; s <= D; s += 0.5) if (sdp(ex - fx * s, ey - fy * s + up * s / D, ez - fz * s) > -0.4) { t = max(s - 0.5, 0.3); break; }
   EY[0] = ex; EY[1] = ey; EY[2] = ez; camClose = t < 1.1; F[CX] = ex - fx * t; F[CY] = ey - fy * t + up * t / D; F[CZ] = ez - fz * t; swapped = true;
@@ -895,6 +965,9 @@ function emitAvatar() {
   } else if (ROLE === 6) {
     const yaw = atan2(-sin(A.hd), cos(A.hd));
     if (A.mode === 0) emit(7, A.x, A.y + 0.1, A.z, yaw, 0, 0, 10.4, A.ph, 3 + (A.mv ? 0.99 : 0), 1.1, 11); else emit(7, A.x, A.y, A.z, yaw, A.pitch, 0, 10.4, A.ph, 1, 1.1, 11);
+  } else if (ROLE === 7) {
+    const yaw = atan2(-sin(A.hd), cos(A.hd));
+    emit(21, A.x, A.y, A.z, yaw, A.pitch, A.roll, 12.4, A.ph, min(1, A.mv / 7) * 0.99, 1.1, 11);
   } else if (ROLE === 5) {
     emit(17, A.x, A.y - A.dig * 0.07 * 1.3, A.z, A.byaw, 0, 0, 0.35, A.ph, A.dig > 0.1 ? 2 + (A.digT !== A.dig ? 0.99 : 0) : A.pinchT > 0 ? 1.99 : A.mv ? 0.99 : 0, 1.3, 15);
   } else if (ROLE === 2 || ROLE === 4) {
@@ -939,6 +1012,7 @@ function doCall() {
     callCd = 0.7; AV.pinchT = 0.7; if (CLICK) CLICK(0, 0.5);
     for (const b of ACT) if ((b.k === 'P' || b.k === 'V') && b.pose !== 2 && hypot(b.x - AV.x, b.z - AV.z) < 1.2) { crabPinchPerson(b, AV.x, AV.z); pinched++; roleHud(); toast(['Ouch!', 'Yow! Something pinched me!', 'Hey! A crab!'][rnd() * 3 | 0]); }
   }
+  else if (ROLE === 7) doLeap();
   else if (ROLE === 4) {
     callCd = 1;
     if (AV.mode === 2 && AV.y > 2 && ground(AV.x, 2, AV.z) < -2) { AV.mode = 3; AV.sp = 10; } else if (AV.mode === 1) { AV.mode = 4; AV.tm = 2.6; splash(AV.x, AV.z); } else toast('Fly out over deeper water, then B to dive');
@@ -1094,7 +1168,7 @@ function updateActors(dt) {
   THREATS.length = 0;
   if (ROLE === 1) THREATS.push([AV.x, AV.z, AV.chg > 0 ? 12 : AV.mv ? 7 : 3.5]);
   for (const b of ACT) if (b.k === 'L' && !b.pup) { if (b.st === 4 || b.st === 5) THREATS.push([b.x, b.z, 11]); else if (b.st >= 1) THREATS.push([b.x, b.z, 6]); else THREATS.push([b.x, b.z, 2.2]); }
-  const far = ROLE === 1 || ROLE === 2 || ROLE === 4 || ROLE === 5 || ROLE === 6 ? 1e5 : 0, px = PL[0] + far, pz = PL[2], py = PL[1];
+  const far = ROLE === 1 || ROLE === 2 || ROLE === 4 || ROLE === 5 || ROLE === 6 || ROLE === 7 ? 1e5 : 0, px = PL[0] + far, pz = PL[2], py = PL[1];
   SLN.fill(0); BLN.fill(0);
   for (let i = 0; i < NACT; i++) {
     const a = ACT[i], k = a.k;
@@ -1115,7 +1189,7 @@ function updateActors(dt) {
     f[o + 8] = k === 'P' || k === 'N' || k === 'V' ? 10 : k === 'G' ? 13 : k === 'C' ? 14 : 11; f[o + 9] = a.seed; f[o + 10] = a.ph;
     f[o + 11] = k === 'P' ? a.pose + a.amt * 0.99 : k === 'V' ? a.amt * 0.99 : k === 'N' ? 4 + a.amt * 0.99 : k === 'L' ? (a.st >= 3 ? 2 + a.lg * 0.99 : a.amt * 0.49 + (a.mv ? 0.5 : 0)) : k === 'G' ? (a.st >= 2 ? 1 + a.amt * 0.99 : a.pk * 0.49 + (a.mv ? 0.5 : 0)) : k === 'C' ? a.pose + a.amt * 0.99 : 1;
   }
-  emitNest(); emitPoop(dt); emitAvatar(); updBaby(dt); emitSplashes(dt); addBlobs();
+  emitNest(); emitPoop(dt); emitAvatar(); emitPrey(dt); updBaby(dt); emitSplashes(dt); addBlobs();
   for (let s = 0; s < SLM.length; s++) if (SLN[s]) Q.writeBuffer(SLB[s], 0, SLI[s], 0, SLN[s] * 12);
 }
 const ibChunk = Wd.chunks.map((c) => buf(c.data, BU.VERTEX)), ibProp = Wd.props.map((c) => buf(c.data, BU.VERTEX));
@@ -1435,7 +1509,7 @@ function frame(now) {
     const ax = lkx * kq, ay = lky * kq; lkx -= ax; lky -= ay; l2x += ax; l2y += ay;
     const dyw = l2x * kq, dpt = l2y * kq; l2x -= dyw; l2y -= dpt;
     const yaw = F[YAW] + dyw; let pitch = F[PIT] - dpt; pitch = pitch < -1.55 ? -1.55 : pitch > 1.55 ? 1.55 : pitch;
-    if (ROLE === 1 || ROLE === 2 || ROLE === 4 || ROLE === 5 || ROLE === 6) { F[YAW] = yaw; F[PIT] = pitch; lookMove(dt, yaw, pitch); } else {
+    if (ROLE === 1 || ROLE === 2 || ROLE === 4 || ROLE === 5 || ROLE === 6 || ROLE === 7) { F[YAW] = yaw; F[PIT] = pitch; lookMove(dt, yaw, pitch); } else {
     // three ways to move: swimming, treading water with the head out (`above`), and walking (`walk`), where forward
     // follows the ground and the eye stays 1.7 m over it
     const flat = walk || above, fast = ks || tN > 1;
@@ -1475,13 +1549,59 @@ function frame(now) {
   if (ROLE === 3) { const spd = hypot(F[VX], F[VZ]); AV.ph += spd * 4.2 * dt; if (spd > 0.4) AV.yawp = atan2(F[VX], F[VZ]); }
   updateActors(dt);
   if (ROLE && TPV) placeCamera();
-  render();
+  drawMap(); render();
   if (hud) {
     hN++; if (dtr > hMax) hMax = dtr; if (dtr < hMin) hMin = dtr; if (dtr > hPer * 1.5) { hLate++; hTot++; }
     F[HUDT] += dtr / 1000;
     if (F[HUDT] > 0.5) { info.textContent = `${(hN / F[HUDT]).toFixed(0)} fps  ·  worst frame ${hMax.toFixed(1)} ms  ·  late frames ${hLate} (total ${hTot})  ·  GPU ${F[GPU].toFixed(2)} ms  ·  ${W}x${H} (${W * 100 / DW | 0}%)`; F[HUDT] = 0; hPer = hMin; hN = 0; hMax = 0; hMin = 1e9; hLate = 0; }
   }
 }
+
+// ---------------------------------------------------------------- overhead map (N, or tap it): small in the corner, large in the middle, or hidden
+// The terrain is sampled once, the first time the map is shown: depth in blues, sand, grass and rock by height, a little hill shading. North (-z) is up, the sea is on the left.
+const MAPC = $('mp'), MC = MAPC.getContext('2d'), MR = 150, MCX = 40, MS = 2, MN = (MR * 2 / MS) | 0;   // the map shows x from -110 to 190 and z from -150 to 150
+let mapMode = 1, mapBase = null;
+const setMap = (m) => { mapMode = m; MAPC.className = ['', 's', 'l'][m]; };
+function buildMap() {
+  const cv = document.createElement('canvas'); cv.width = cv.height = MN;
+  const c = cv.getContext('2d'), im = c.createImageData(MN, MN), H = new Float32Array(MN * MN);
+  for (let j = 0; j < MN; j++) for (let i = 0; i < MN; i++) {
+    const x = MCX - MR + (i + 0.5) * MS, z = -MR + (j + 0.5) * MS; let h;
+    if (hypot(x, z) > 188) h = -30;
+    else if (sdp(x, 0, z) > 0) { h = 0; for (let y = 0; y < 45; y += 0.5) { h = y; if (sdp(x, y, z) <= 0) break; } }
+    else { h = -36; for (let y0 = -0.1; y0 > -40; y0 -= 9) { const g = ground0(x, y0, z); if (g > -1e8) { h = min(g, 0); break; } } }
+    H[j * MN + i] = h;
+  }
+  const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  for (let j = 0; j < MN; j++) for (let i = 0; i < MN; i++) {
+    const k = j * MN + i, h = H[k], nw = H[(j ? j - 1 : j) * MN + (i ? i - 1 : i)]; let col;
+    if (h < 0) { const d = clamp(-h / 32, 0, 1); col = lerp3([112, 214, 216], [8, 46, 84], pow(d, 0.55)); col = col.map((q) => q * (1 + clamp((h - nw) * 0.03, -0.15, 0.15))); }
+    else {
+      col = h < 2.4 ? lerp3([232, 214, 160], [214, 196, 138], h / 2.4) : h < 9 ? lerp3([214, 196, 138], [112, 150, 84], (h - 2.4) / 6.6) : h < 22 ? lerp3([112, 150, 84], [150, 144, 130], (h - 9) / 13) : lerp3([150, 144, 130], [214, 212, 205], clamp((h - 22) / 20, 0, 1));
+      col = col.map((q) => q * (1 + clamp((h - nw) * 0.09, -0.35, 0.35)));
+    }
+    im.data[k * 4] = col[0]; im.data[k * 4 + 1] = col[1]; im.data[k * 4 + 2] = col[2]; im.data[k * 4 + 3] = 255;
+  }
+  c.putImageData(im, 0, 0); return cv;
+}
+function drawMap() {
+  if (!mapMode || menu) return;
+  if (!mapBase) mapBase = buildMap();
+  const S = mapMode === 2 ? 720 : 240, k = S / (MR * 2), X = (x) => (x - MCX + MR) * k, Z = (z) => (z + MR) * k, me = ROLE && ROLE !== 3 ? AV : PL;
+  if (MAPC.width !== S) MAPC.width = MAPC.height = S;
+  MC.imageSmoothingEnabled = true; MC.drawImage(mapBase, 0, 0, S, S);
+  MC.textAlign = 'center'; MC.textBaseline = 'middle'; MC.font = '700 ' + (S / 34 | 0) + 'px system-ui, sans-serif'; MC.lineWidth = S / 160;
+  const tag = (t, x, y) => { MC.strokeStyle = '#000b'; MC.strokeText(t, x, y); MC.fillStyle = '#fff'; MC.fillText(t, x, y); };
+  if (mapMode === 2) { tag('SEA', X(-60), Z(0)); tag('BEACH', X(136), Z(-58)); tag('CLIFFS', X(176), Z(70)); }
+  for (const b of ACT) if (b.k === 'L' && !b.pup) { MC.fillStyle = '#7a4a1e'; MC.beginPath(); MC.arc(X(b.x), Z(b.z), S / 120, 0, TAU); MC.fill(); }
+  if (ROLE === 7) { MC.fillStyle = '#e8f4ff'; for (const f of PREY) { MC.beginPath(); MC.arc(X(f.x), Z(f.z), S / 170, 0, TAU); MC.fill(); } }
+  POSES.forEach((q, i) => { MC.fillStyle = '#ffd24a'; MC.beginPath(); MC.arc(X(q[0]), Z(q[2]), S / 46, 0, TAU); MC.fill(); MC.fillStyle = '#222'; MC.fillText(i + 1, X(q[0]), Z(q[2]) + 1); });
+  if (Wd.tower) { MC.fillStyle = '#e8402a'; MC.fillRect(X(Wd.tower[0]) - S / 90, Z(Wd.tower[2]) - S / 90, S / 45, S / 45); if (mapMode === 2) tag('lifeguard', X(Wd.tower[0]) - S / 11, Z(Wd.tower[2])); }
+  MC.save(); MC.translate(X(me[0] !== undefined ? me[0] : me.x), Z(me[2] !== undefined ? me[2] : me.z)); MC.rotate(F[YAW]);
+  MC.fillStyle = '#ff3b6b'; MC.strokeStyle = '#fff'; MC.lineWidth = S / 130; MC.beginPath(); MC.moveTo(0, -S / 32); MC.lineTo(S / 56, S / 44); MC.lineTo(0, S / 90); MC.lineTo(-S / 56, S / 44); MC.closePath(); MC.stroke(); MC.fill(); MC.restore();
+}
+MAPC.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); setMap(mapMode === 1 ? 2 : 1); });
+setMap(1);
 
 // ---------------------------------------------------------------- input
 const key = (e, v) => {
@@ -1491,7 +1611,8 @@ const key = (e, v) => {
     default: if (v && !e.repeat) {
       if (e.code === 'KeyH') { hud = !hud; hTot = 0; hPer = 1e9; info.textContent = ''; }
       else if (e.code === 'KeyM') mute();
-      else if (e.code === 'KeyT') setRole((ROLE + 1) % 7);
+      else if (e.code === 'KeyN') setMap((mapMode + 1) % 3);
+      else if (e.code === 'KeyT') setRole((ROLE + 1) % ROLES.length);
       else if (e.code === 'KeyV') { if (ROLE) TPV = !TPV; }
       else if (e.code === 'KeyB') doCall();
       else if (e.code === 'KeyP') doPoop();
@@ -1513,15 +1634,16 @@ $('dS').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropa
 if (TOUCHUI && !mob) { let dn = false; canvas.addEventListener('mousedown', () => { dn = true; }); addEventListener('mouseup', () => { dn = false; }); addEventListener('mousemove', (e) => { if (dn) { mdx += e.movementX; mdy += e.movementY; } }); }
 // touch buttons: next viewpoint, next role, view, the animal's call (B) and its special action (E: charge, dig, take off)
 var vpI = 7;
-const TB = [1, 2, 3, 4, 5, 6].map((i) => $('t' + i)), SPECIAL = { 1: 'Charge', 2: 'Take off', 4: 'Take off', 5: 'Dig' };
-const TLAB = ['', 'Bark', 'Squawk', 'Warn', 'Dive', 'Pinch', 'Grunt'];
+const TB = [1, 2, 3, 4, 5, 6, 7].map((i) => $('t' + i)), SPECIAL = { 1: 'Charge', 2: 'Take off', 4: 'Take off', 5: 'Dig' };
+const TLAB = ['', 'Bark', 'Squawk', 'Warn', 'Dive', 'Pinch', 'Grunt', 'Leap'];
 var tbUpdate = () => { TB[1].textContent = ROLE ? 'Role: ' + ROLES[ROLE] : 'Role'; TB[2].hidden = !ROLE; TB[3].hidden = !ROLE; TB[3].textContent = TLAB[ROLE]; TB[4].hidden = !SPECIAL[ROLE]; TB[4].textContent = SPECIAL[ROLE] || ''; TB[5].hidden = ROLE !== 2; };
 const tbOn = (b, f) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound(); f(e); });
 tbOn(TB[0], () => { if (ROLE) setRole(0); vpI = (vpI + 1) % 8; lookAt(...POSES[vpI]); });
-tbOn(TB[1], () => setRole((ROLE + 1) % 7));
+tbOn(TB[1], () => setRole((ROLE + 1) % ROLES.length));
 tbOn(TB[2], () => { if (ROLE) TPV = !TPV; });
 tbOn(TB[3], () => doCall());
 tbOn(TB[5], () => doPoop());
+tbOn(TB[6], () => setMap((mapMode + 1) % 3));
 tbOn(TB[4], () => { key({ code: 'KeyE', repeat: false }, 1); const up = () => { key({ code: 'KeyE' }, 0); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); }; addEventListener('pointerup', up); addEventListener('pointercancel', up); });
 tbUpdate();
 const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; $('dS').className = ''; tId = -1; tN = 0; };

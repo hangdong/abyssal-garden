@@ -125,6 +125,10 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
 #tl button { padding: 0; font-size: 1em; letter-spacing: 0; }
 #tl button.on { background: #7ff3ff; }
 .p #o { display: none; }
+/* the overhead map: small in the corner or large in the middle (N or a tap on it) */
+#mp { position: absolute; display: none; border-radius: .6em; box-shadow: 0 0 0 2px #7ff3ff, 0 .4em 1.4em #000b; background: #03131c; cursor: pointer; touch-action: none; }
+.g #mp.s { display: block; top: .6em; left: .6em; width: 11.5em; height: 11.5em; opacity: .92; }
+.g #mp.l { display: block; inset: 0; margin: auto; width: min(88vh, 88vw); height: min(88vh, 88vw); }
 #i {
   position: absolute; top: 1em; left: 1.2em; margin: 0; font: .8em/1.6 ui-monospace, Consolas, monospace;
   white-space: pre-wrap; text-shadow: 0 1px 4px #000; pointer-events: none;
@@ -146,13 +150,14 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
           <i><b>Q</b><b>E</b></i>Down / up
           <i><b>Shift</b></i>Faster
           <i><b>1</b>–<b>8</b></i>Viewpoints
-          <i><b>T</b></i>Play as: sea lion, gull, lifeguard, pelican, crab
-          <i><b>B</b></i>Bark / squawk / warn / dive / pinch (crab: E digs in)
+          <i><b>T</b></i>Play as: sea lion, gull, lifeguard, pelican, crab, seal, dolphin
+          <i><b>B</b></i>Bark / squawk / warn / dive / pinch / leap (crab: E digs in)
           <i><b>V</b></i>Chase / first-person view
         </p>
         <p>
           <i><b>Esc</b></i>Menu
           <i><b>M</b></i>Mute
+          <i><b>N</b></i>Map: small / large / off
           <i><b>H</b></i>Stats
         </p>
       </div>
@@ -166,10 +171,11 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
 </div>
 <button id=o aria-label=Menu>≡</button>
 <div id=t>
-  <div id=tr><button id=t1>Place</button><button id=t2>Role</button><button id=t3>View</button></div>
+  <div id=tr><button id=t1>Place</button><button id=t2>Role</button><button id=t3>View</button><button id=t7>Map</button></div>
   <div id=ta><button id=t6 hidden>Poop</button><button id=t5>Action</button><button id=t4>Call</button></div>
   <div id=tl><button id=dU style="grid-area:1/2" aria-label=Forward>▲</button><button id=dL style="grid-area:2/1" aria-label=Left>◀</button><button id=dS style="grid-area:2/2" aria-label=Run>»</button><button id=dR style="grid-area:2/3" aria-label=Right>▶</button><button id=dD style="grid-area:3/2" aria-label=Back>▼</button></div>
 </div>
+<canvas id=mp></canvas>
 <pre id=i></pre>
 <script>
 /*SCRIPT*/
