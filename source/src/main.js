@@ -916,26 +916,27 @@ function emitPrey(dt) {
 }
 // the sea floor under (x, z), searching down in steps (ground() only looks 9 m); -1e9 where there is none
 function seabed(x, z) { for (let y0 = -0.1; y0 > -42; y0 -= 9) { const g = ground0(x, y0, z); if (g > -1e8) return g; } return -1e9; }
-// leopard shark (8) and stingray (9): both live on the sea floor. The shark cruises low and scans (B) for creatures buried in the sand; the ray glides over the
-// floor and B buries it, eyes out, and anyone who comes close to it in the water is stung.
+// leopard shark (8) and stingray (9): both live on the sea floor. The shark cruises low and scans (B) for creatures buried in the sand; the ray glides anywhere in the water and B buries it, eyes out, and anyone who comes close to it in the water is stung.
 var sharkEaten = 0, stung = 0, BPREY = [];
 function finMove(dt, yaw, pitch, mf, mr, fast) {
-  const A = AV, ray = ROLE === 9, sy = sin(yaw), cw = cos(yaw), cp = ray ? 1 : cos(pitch);
+  const A = AV, ray = ROLE === 9, sy = sin(yaw), cw = cos(yaw), cp = cos(pitch);
   if (ray) A.dig += clamp(A.digT - A.dig, -dt / 0.8, dt / 0.8);
-  const bur = ray && A.dig > 0.5, sp = ray ? (fast ? 5 : 2.8) : (fast ? 9 : 4.5), k = 1 - exp(-dt * (ray ? 4 : 2.2)), m = bur ? 0 : 1;
+  const bur = ray && A.dig > 0.5, sp = ray ? (fast ? 6.5 : 3.4) : (fast ? 9 : 4.5), k = 1 - exp(-dt * (ray ? 4 : 2.2)), m = bur ? 0 : 1;
   A.vx += ((sy * cp * mf + cw * mr) * sp * m - A.vx) * k; A.vz += ((-cw * cp * mf + sy * mr) * sp * m - A.vz) * k;
-  if (ray) { /* E rises, all the way to the surface under the swimmers */ A.off = clamp(A.off + (ku - kd) * dt * 3, 0, 45); A.vy = 0; } else A.vy += ((sin(pitch) * mf + (ku - kd)) * sp - A.vy) * k;
+  A.vy += ((sin(pitch) * mf + (ku - kd)) * sp * m - A.vy) * k;   // a ray swims freely in three dimensions, up to the surface and down to the floor
   let nx = A.x + A.vx * dt, nz = A.z + A.vz * dt, ny = A.y + A.vy * dt; const r = hypot(nx, nz); if (r > 150) { nx *= 150 / r; nz *= 150 / r; } if (nx > 120) nz = nz < -72 ? -72 : nz > 72 ? 72 : nz;
   const g0 = ground(nx, 2, nz);
   if (g0 > (ray ? -0.5 : -1.2)) { A.vx = A.vz = 0; nx = A.x; nz = A.z; }
   else if (sdp(nx, ny, nz) > -0.05) { A.vx = A.vz = A.vy = 0; nx = A.x; nz = A.z; ny = A.y; }
   A.x = nx; A.z = nz;
   const g = seabed(A.x, A.z);
-  if (ray) { const ty = g > -1e8 ? min(g + 0.16 + A.off * (1 - A.dig) - A.dig * 0.27, -0.5) : A.y; A.y += (ty - A.y) * min(1, dt * 8); }
-  else { if (g > -1e8 && ny < g + 0.35) ny = g + 0.35; A.y = ny > -0.5 ? -0.5 : ny < -50 ? -50 : ny; }
+  if (ray) {
+    if (A.digT && g > -1e8) A.y += (g - 0.11 - A.y) * min(1, dt * 6);   // burying itself: sinks into the sand
+    else { const lo = g > -1e8 ? g + 0.3 : -1e9; A.y = ny < lo ? A.y + (lo - A.y) * min(1, dt * 5) : ny > -0.4 ? -0.4 : ny; }
+  } else { if (g > -1e8 && ny < g + 0.35) ny = g + 0.35; A.y = ny > -0.5 ? -0.5 : ny < -50 ? -50 : ny; }
   const hs = hypot(A.vx, A.vz); if (hs > 0.2) avTurn(atan2(A.vz, A.vx), ray ? 5 : 3, dt);
-  if (!ray) A.pitch += (atan2(A.vy, max(hs, 1)) - A.pitch) * min(1, dt * 4); else A.pitch = 0;
-  A.mv = hs; A.ph += dt * (ray ? 1.5 + hs * 1.8 : 2 + hs * 1.1);
+  A.pitch += ((bur ? 0 : atan2(A.vy, max(hs, 1))) - A.pitch) * min(1, dt * 4);
+  A.mv = hs; A.ph += dt * (ray ? 1.8 + hs * 1.5 : 2 + hs * 1.1);
   F[CX] = A.x; F[CY] = A.y + (ray ? 0.3 : 0); F[CZ] = A.z;
   if (ray) { // anyone wading or swimming close enough is stung (a buried ray reaches a little further: it is an ambush)
     const reach = bur ? 1.7 : 1.0;
@@ -1052,7 +1053,7 @@ function emitAvatar() {
   } else if (ROLE === 8) {
     emit(22, A.x, A.y, A.z, atan2(-sin(A.hd), cos(A.hd)), A.pitch, 0, 13.4, A.ph, min(1, A.mv / 4) * 0.99, 1.3, 11);
   } else if (ROLE === 9) {
-    emit(23, A.x, A.y, A.z, atan2(-sin(A.hd), cos(A.hd)), 0, 0, 15.4, A.ph, (A.dig > 0.5 ? 0 : min(1, A.mv / 3)) * 0.99, 1.3, 11);
+    emit(23, A.x, A.y, A.z, atan2(-sin(A.hd), cos(A.hd)), A.pitch * 0.7, 0, 15.4, A.ph, (A.dig > 0.5 ? 0 : min(1, A.mv / 3)) * 0.99, 1.3, 11);
   } else if (ROLE === 10) {
     const yk = atan2(-sin(A.hd), cos(A.hd)), yp = atan2(cos(A.hd), sin(A.hd)), fx = cos(A.hd), fz = sin(A.hd);
     emit(12, A.x, A.y, A.z, yk, 0, 0, 0.37, 0, 0); emit(1, A.x, A.y + 0.05, A.z, yp, 0, 0, 0.37, A.ph, 6);

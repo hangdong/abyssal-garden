@@ -292,6 +292,13 @@ fn topC(h: f32) -> vec3f {
 fn botC(h: f32) -> vec3f {
   if (h < .25) { return vec3f(.03, .06, .22); } if (h < .5) { return vec3f(.28, .22, .12); } if (h < .75) { return vec3f(.02, .02, .03); } return vec3f(.02, .3, .35);
 }
+// round dark spots scattered through space (one per cell, jittered in size and place): the leopard shark's
+fn h31(p: vec3f) -> f32 { var q = fract(p * .1031); q += dot(q, q.zyx + 31.32); return fract((q.x + q.y) * q.z); }
+fn spots3(p: vec3f) -> f32 {
+  let c = floor(p); let f = fract(p);
+  let o = vec3f(h31(c), h31(c + 7.3), h31(c + 13.1)) * .5 + .25;
+  return 1. - ss(.15 + .17 * h31(c + 3.7) - .05, .15 + .17 * h31(c + 3.7), length(f - o));
+}
 fn partC(ao: f32, sd: f32) -> vec3f {
   let a = fract(sd * 13.7); let b = fract(sd * 7.3 + .31); let c = fract(sd * 3.9 + .7);
   if (ao < .3) { return mix(skinC(a), vec3f(.55, .2, .2), step(.27, ao) * .75); }
@@ -693,7 +700,7 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
       let sp2 = ss(.6, .68, B.c * .5 + C.c * .5 + (fract(sd * 3.1) - .5) * .1); let back = ss(-.15, .35, on.y);
       var kc = vec3f(.55, .5, .4) * (.85 + .3 * B.h);
       if (sd < 15.) {   // a leopard shark: tan above with dark saddles and spots, white below
-        kc = mix(kc, vec3f(.11, .08, .06), sp2 * back * .85); kc = mix(kc, vec3f(.86, .84, .78), ss(.05, -.5, on.y));
+        let dots = max(spots3(i.op * 7.), spots3(i.op * 13. + 5.) * .9); kc = mix(kc, vec3f(.1, .07, .05), max(sp2, dots) * ss(-.5, .1, on.y) * .9); kc = mix(kc, vec3f(.86, .84, .78), ss(.05, -.5, on.y));
         kc = mix(kc, kc * .75, step(.6, i.ao) * step(i.ao, .7));
       } else {          // a round stingray: sandy and mottled above, pale below, darker tail
         kc = mix(vec3f(.5, .42, .3), vec3f(.36, .3, .22), sp2) * (.85 + .3 * B.h); kc = mix(kc, vec3f(.85, .8, .72), ss(.05, -.5, on.y));
